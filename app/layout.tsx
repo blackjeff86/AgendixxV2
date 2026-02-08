@@ -23,7 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body className="font-sans">
+      <body className="font-sans theme-light" suppressHydrationWarning>
         <script
           dangerouslySetInnerHTML={{
             __html:

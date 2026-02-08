@@ -29,18 +29,15 @@ export default function AdminLoginPage() {
 
   return (
     <div className="bg-slate-50 text-text-main min-h-screen flex flex-col">
-      <div className="flex items-center bg-transparent p-4 pb-2 justify-between safe-top">
-        <h2 className="text-text-main text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center">
-          Admin Login
-        </h2>
-      </div>
+      <div className="flex items-center bg-transparent p-4 pb-2 justify-between safe-top" />
 
       <div className="flex-1 flex flex-col px-6 justify-center max-w-[480px] mx-auto w-full pb-12">
         <div className="flex flex-col items-center mb-10">
-          <div className="w-20 h-20 bg-primary/10 rounded-2xl flex items-center justify-center mb-4">
-            <span className="material-symbols-outlined text-primary text-5xl">calendar_today</span>
-          </div>
-          <h1 className="text-text-main tracking-tight text-[32px] font-bold leading-tight text-center">Agendix</h1>
+          <img
+            src="/agendix_logo_vertical_v2.png"
+            alt="Agendixx"
+            className="h-24 w-auto object-contain mb-4"
+          />
           <p className="text-text-muted text-base font-normal leading-normal text-center mt-2">
             Acesse seu painel administrativo
           </p>
@@ -114,7 +111,6 @@ export default function AdminLoginPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-3 text-center">
-            <p className="text-text-muted text-sm font-medium">Clique e faça o seu cadastro.</p>
             <Link
               href="/admin/register"
               className="flex items-center justify-center gap-2 bg-surface-light border border-border-light text-text-main py-3 px-4 rounded-xl hover:bg-slate-50 transition-colors shadow-sm font-bold text-sm"
@@ -127,7 +123,7 @@ export default function AdminLoginPage() {
 
         <div className="mt-auto pt-10 pb-4">
           <p className="text-text-muted text-[11px] font-medium text-center leading-relaxed">
-            © 2024 AGENDIX SAAS. V2.4.0
+            © 2026 AGENDIX SAAS. V2.4.0
             <br />
             SEGURANÇA E PERFORMANCE PARA O SEU SALÃO.
           </p>
