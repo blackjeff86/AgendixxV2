@@ -146,7 +146,7 @@ export default function HomePage() {
                     <h3 className="font-heading text-lg font-semibold text-[hsl(215_25%_15%)]">Studio Bella</h3>
                     <p className="text-sm text-[hsl(215_16%_47%)]">Selecione um horário</p>
                   </div>
-                  <div className="rounded-lg bg-[var(--landing-primary-10)] px-3 py-1.5 text-sm font-medium text-[var(--landing-primary)]">
+                  <div className="rounded-lg bg-[var(--landing-primary-20)] px-3 py-1.5 text-sm font-medium text-[var(--landing-primary-dark)]">
                     Fevereiro 2026
                   </div>
                 </div>
@@ -166,7 +166,7 @@ export default function HomePage() {
                         className={[
                           "flex h-10 items-center justify-center rounded-lg text-sm",
                           selected
-                            ? "bg-[var(--landing-primary)] font-semibold text-white"
+                            ? "bg-[var(--landing-primary-dark)] font-semibold text-white"
                             : highlighted
                               ? "bg-[var(--landing-primary-10)] font-medium text-[var(--landing-primary)]"
                               : "text-[hsl(215_25%_15%)] hover:bg-[hsl(214_32%_91%)]",
