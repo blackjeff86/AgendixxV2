@@ -39,7 +39,7 @@ function formatPhoneBR(value: string) {
    const [adminPassword, setAdminPassword] = useState("");
    const [phone, setPhone] = useState("");
    const [address, setAddress] = useState("");
-   const [professionalsCount, setProfessionalsCount] = useState("1");
+  const [professionalsCount, setProfessionalsCount] = useState("2");
  
    async function onSubmit() {
      setLoading(true);
@@ -93,20 +93,18 @@ function formatPhoneBR(value: string) {
  
    return (
      <div className="bg-slate-50 text-text-main min-h-screen flex flex-col">
-       <div className="flex items-center bg-transparent p-4 pb-2 justify-between safe-top">
-        <h2 className="text-text-main text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center">
-          Cadastro Novo Salão
-        </h2>
-       </div>
+      <div className="flex items-center bg-transparent p-4 pb-2 justify-between safe-top" />
  
        <div className="flex-1 flex flex-col px-6 justify-center max-w-[520px] mx-auto w-full pb-12">
-         <div className="flex flex-col items-center mb-8">
-           <div className="w-20 h-20 bg-primary/10 rounded-2xl flex items-center justify-center mb-4">
-             <span className="material-symbols-outlined text-primary text-5xl">storefront</span>
-           </div>
-          <h1 className="text-text-main tracking-tight text-[28px] font-bold leading-tight text-center">
-            Cadastro Novo Salão
-          </h1>
+        <div className="flex flex-col items-center mb-8">
+          <img
+            src="/agendix_logo_vertical_v2.png"
+            alt="Agendixx"
+            className="h-24 w-auto object-contain mb-4"
+          />
+         <h1 className="text-text-main tracking-tight text-[28px] font-bold leading-tight text-center">
+           Cadastro Novo Salão
+         </h1>
            <p className="text-text-muted text-base font-normal leading-normal text-center mt-2">
              Crie o painel administrativo do seu salão.
            </p>

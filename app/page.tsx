@@ -1,448 +1,584 @@
 import Image from "next/image";
 
-const benefits = [
-  {
-    icon: "schedule",
-    title: "Agendamento 24h",
-    description: "Seu cliente marca horário mesmo quando você está descansando.",
-  },
-  {
-    icon: "dashboard_customize",
-    title: "Painel Admin",
-    description: "Controle total do seu negócio com facilidade e rapidez extrema.",
-  },
-  {
-    icon: "content_cut",
-    title: "Gestão de Serviços",
-    description: "Cadastre e gerencie seus serviços de forma 100% personalizada.",
-  },
-  {
-    icon: "calendar_view_week",
-    title: "Visão Semanal",
-    description: "Visualize sua agenda do jeito que preferir para melhor controle.",
-  },
-  {
-    icon: "groups",
-    title: "Equipe Organizada",
-    description: "Gerencie profissionais e comissões sem qualquer complicação.",
-  },
-];
-
-const steps = [
-  {
-    title: "Cadastre seu salão",
-    description: "Crie sua conta em segundos e comece a profissionalizar sua agenda digital.",
-  },
-  {
-    title: "Configure serviços",
-    description: "Personalize horários, preços e profissionais da sua equipe de forma intuitiva.",
-  },
-  {
-    title: "Receba agendamentos",
-    description: "Compartilhe seu link exclusivo e veja sua agenda encher automaticamente.",
-  },
-];
-
-const testimonials = [
-  {
-    name: "Mariana Silva",
-    role: "Studio Hair Premium",
-    quote:
-      '"Minha vida mudou. Não preciso mais responder WhatsApp no domingo à noite. O Agendixx faz tudo sozinho."',
-    avatar:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuCj7USqC9Zt-otbDR932WLqgEYI5q2V45qvMvzoIth8h3tybiHK5WEAvuAEl5ps_uo116F9o67-597Rb7RpdUrFAR-GaMJfuZsh-OPvOl0xZOvCpvKClUxxmdR8uz9JG8yri27SG75nauLJH3zC4zwYpsms_jCBn1kb6rGo8Os995EFw3_9Xv9c5Nn765UyL0A4Tk-Nx_MikwT31kCPF1O5xi0ZVvFivTFGgzulBG4nbId3Q-ZORFcH82WmjIVRp7gF-JP2lJITl-4",
-  },
-  {
-    name: "Ricardo Alvez",
-    role: "Barbeiro de Elite",
-    quote:
-      '"O custo-benefício é imbatível. Com um corte de cabelo eu pago o mês inteiro da plataforma."',
-    avatar:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuBQI7zfJHqYAZM2P-F0iZd7Vs2rPcNQ9zRzTh1n0ozZaY0_nrzThzQP3MHth93M3y8NOKL5M9-URZ4HsfOYTRfduv1mWzsVM1q7HO1tBiPGzjBSBTGtfEosWgO1rXhnyCT6BNxzrE_KwPiPIItAxmLPQyeFhJSIzSsX61FcA1KolRI4TC8FKUZINcp8zaNOYdYSSiQPETwT5JCnMSob3GTqGZHfzsuSQuIqDj2iOH5bJKIUjsgQT2GCMv9KyXqmWIIiZUp5jPDEljI",
-  },
-  {
-    name: "Juliana Costa",
-    role: "Nail Designer Expert",
-    quote:
-      '"Design limpo e muito fácil de usar. Minhas clientes amaram a facilidade de agendar pelo celular."',
-    avatar:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuBVZAz4HpO3KS_g6VWdHxN7NUZLz_ZM-9fRSSbcjWB0Ky1Jv9LO53ImNs7ytKuvzVLqJ2uw0pkePhvNCDVJ3gOP8kbXAROBU2Ovvu82Q9xFdh3Wh_VL-4vjlKqCfN5IIbk3E2T5N9qDr0FCvdF5ulLAMqaACYlMt9_Y7F59eyFxRSKHJ0xmNsxc7ZL2DVRYrPqppNyZWR_VY4wl9m_GsNiyu5Qu392EWdBLo6O_OGMY4vGendPkDFgNdpZD_Hn3WgbjhhQcihnKQI4",
-  },
-];
-
-const faqs = [
-  {
-    question: "Como funciona o teste gratuito?",
-    answer:
-      "Você pode utilizar todas as funcionalidades por 7 dias sem precisar cadastrar cartão de crédito. Se gostar, é só escolher um plano.",
-  },
-  {
-    question: "Posso cancelar a qualquer momento?",
-    answer:
-      "Sim! Não temos contrato de fidelidade. Você paga mês a mês e pode cancelar quando quiser sem multas.",
-  },
-  {
-    question: "As notificações de WhatsApp são pagas à parte?",
-    answer: "Não, os lembretes automáticos já estão inclusos no valor mensal da sua assinatura por profissional.",
-  },
-];
-
-export default function Home() {
+export default function HomePage() {
   return (
-    <div className="bg-background-light text-text-main min-h-screen">
-      <div className="relative flex min-h-screen w-full flex-col overflow-x-hidden">
-        <header className="sticky top-0 z-50 w-full bg-background-light/90 backdrop-blur-md border-b border-border-light px-6 lg:px-10 py-3">
-          <div className="flex items-center justify-between max-w-[1200px] mx-auto">
-            <div className="flex items-center">
-              <div className="inline-flex items-center justify-center">
-                <Image
-                  src="/logo-axk.png"
-                  alt="Agendixx"
-                  width={360}
-                  height={80}
-                  className="h-10 w-[180px] object-contain"
-                  priority
-                />
-              </div>
-            </div>
-            <nav className="hidden md:flex items-center gap-8">
-              <a className="text-sm font-semibold hover:text-primary transition-colors" href="#beneficios">
-                Benefícios
-              </a>
-              <a className="text-sm font-semibold hover:text-primary transition-colors" href="#como-funciona">
-                Como Funciona
-              </a>
-              <a className="text-sm font-semibold hover:text-primary transition-colors" href="#precos">
-                Preços
-              </a>
-              <div className="flex items-center gap-3">
-                <a
-                  href="/admin/register"
-                  className="bg-primary text-white px-5 py-2.5 rounded-lg text-sm font-bold hover:brightness-110 transition-all inline-flex items-center justify-center"
-                >
-                  Quero testar agora
+    <main className="landing-theme font-landing antialiased bg-[hsl(210_40%_98%)] text-[hsl(215_25%_15%)]">
+      <header className="sticky top-0 z-50 border-b border-[hsl(214_32%_91%)] bg-[rgba(255,255,255,0.8)] backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 lg:px-8">
+          <a href="/" className="flex items-center">
+            <Image
+              src="/logo-axk.png"
+              alt="Agendixx"
+              width={320}
+              height={120}
+              className="h-auto w-[180px] object-contain"
+              priority
+            />
+          </a>
+
+          <nav className="hidden items-center gap-8 md:flex">
+            <a href="#para-quem" className="text-sm font-medium text-[hsl(215_16%_47%)] transition-colors hover:text-[hsl(215_25%_15%)]">
+              Para quem
+            </a>
+            <a href="#como-funciona" className="text-sm font-medium text-[hsl(215_16%_47%)] transition-colors hover:text-[hsl(215_25%_15%)]">
+              Como funciona
+            </a>
+            <a href="#funcionalidades" className="text-sm font-medium text-[hsl(215_16%_47%)] transition-colors hover:text-[hsl(215_25%_15%)]">
+              Funcionalidades
+            </a>
+            <a href="#precos" className="text-sm font-medium text-[hsl(215_16%_47%)] transition-colors hover:text-[hsl(215_25%_15%)]">
+              Preços
+            </a>
+          </nav>
+
+          <div className="hidden items-center gap-3 md:flex">
+            <a
+              href="/admin/login"
+              className="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium text-[hsl(215_25%_15%)] transition-colors hover:bg-[hsl(214_32%_95%)]"
+            >
+              Entrar
+            </a>
+            <a
+              href="/admin/register"
+              className="inline-flex items-center justify-center rounded-lg bg-[var(--landing-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--landing-primary-dark)]"
+            >
+              Começar agora
+            </a>
+          </div>
+
+          <details className="md:hidden group">
+            <summary className="list-none text-[hsl(215_25%_15%)]" aria-label="Abrir menu">
+              <svg className="h-6 w-6 group-open:hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                <line x1="4" y1="6" x2="20" y2="6" />
+                <line x1="4" y1="12" x2="20" y2="12" />
+                <line x1="4" y1="18" x2="20" y2="18" />
+              </svg>
+              <svg className="h-6 w-6 hidden group-open:block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </summary>
+            <div className="absolute left-0 right-0 top-full border-t border-[hsl(214_32%_91%)] bg-white px-4 pb-4">
+              <nav className="flex flex-col gap-3 pt-3">
+                <a href="#para-quem" className="text-sm font-medium text-[hsl(215_16%_47%)] transition-colors hover:text-[hsl(215_25%_15%)]">
+                  Para quem
+                </a>
+                <a href="#como-funciona" className="text-sm font-medium text-[hsl(215_16%_47%)] transition-colors hover:text-[hsl(215_25%_15%)]">
+                  Como funciona
+                </a>
+                <a href="#funcionalidades" className="text-sm font-medium text-[hsl(215_16%_47%)] transition-colors hover:text-[hsl(215_25%_15%)]">
+                  Funcionalidades
+                </a>
+                <a href="#precos" className="text-sm font-medium text-[hsl(215_16%_47%)] transition-colors hover:text-[hsl(215_25%_15%)]">
+                  Preços
                 </a>
                 <a
                   href="/admin/login"
-                  className="bg-white border border-border-light px-5 py-2.5 rounded-lg text-sm font-bold text-text-main hover:bg-slate-50 transition-all inline-flex items-center justify-center"
+                  className="mt-2 inline-flex w-full items-center justify-center rounded-lg px-4 py-2 text-sm font-medium text-[hsl(215_25%_15%)] transition-colors hover:bg-[hsl(214_32%_95%)]"
                 >
-                  Login admin
+                  Entrar
                 </a>
-              </div>
-            </nav>
-          </div>
-        </header>
-
-        <main className="flex-1">
-          <section className="max-w-[1200px] mx-auto px-6 lg:px-10 py-16 lg:py-24 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div className="flex flex-col gap-8">
-              <div className="flex flex-col gap-4">
-                <span className="inline-block px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-bold uppercase tracking-widest w-fit">
-                  Gestão Inteligente
-                </span>
-                <h1 className="text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight">
-                  Agendamento online simples, rápido e profissional.
-                </h1>
-                <p className="text-lg text-text-muted max-w-lg">
-                  Transforme a gestão do seu salão com a Agendixx. Disponível 24h por dia para seus clientes, sem que
-                  você precise parar o que está fazendo.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-4">
                 <a
                   href="/admin/register"
-                  className="bg-primary text-white h-14 px-8 rounded-xl text-lg font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all inline-flex items-center justify-center"
+                  className="inline-flex w-full items-center justify-center rounded-lg bg-[var(--landing-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--landing-primary-dark)]"
                 >
-                  Quero testar agora
+                  Começar agora
                 </a>
-                <a
-                  href="https://wa.me/5500000000000"
-                  className="bg-white border border-border-light h-14 px-8 rounded-xl text-lg font-bold inline-flex items-center justify-center gap-2 hover:bg-slate-50 transition-all"
-                >
-                  <span className="material-symbols-outlined">chat</span>
-                  WhatsApp
-                </a>
-              </div>
+              </nav>
             </div>
-            <div className="relative">
-              <div className="bg-white rounded-2xl shadow-2xl p-4 border border-border-light aspect-[4/3] w-full overflow-hidden">
-                <img
-                  alt="Interface do painel Agendixx"
-                  className="rounded-xl w-full h-full object-cover grayscale-[0.2] hover:grayscale-0 transition-all duration-700"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuBkGOE7j5jjprYWm_mA7Q6KQh3FZUhADalhe08IJKUB1I19y4KuPPkczWFQGz4a2ZZQnBf4eZVUxnO334FExHmI8vbD3UF7jnWMtjeH04i7pYM6i6462hxcBBgR-Nyr8r4yxVb-5Zlskg0Rl6tn_yLFWrclMC8hH7_6Yig2k2en1VEQlq9uD2SoXl4x5nVYAWSisdGHsIWYrhoYctuOmuDXF8kP-6FETNry9GbSnYgIsgRjzTT2XehgwCJ791Z5t26ZBqMt0nKZePk"
-                />
-              </div>
-              <div className="absolute -bottom-6 -left-6 bg-primary p-6 rounded-2xl shadow-xl hidden md:block">
-                <p className="text-white text-3xl font-black">24h</p>
-                <p className="text-white/80 text-xs font-bold uppercase">Agendamento Ativo</p>
-              </div>
-            </div>
-          </section>
+          </details>
+        </div>
+      </header>
 
-          <section className="bg-white py-20 border-y border-border-light" id="beneficios">
-            <div className="max-w-[1200px] mx-auto px-6">
-              <div className="text-center mb-16 space-y-4">
-                <h2 className="text-4xl font-extrabold tracking-tight">Por que escolher a Agendixx?</h2>
-                <p className="text-text-muted max-w-2xl mx-auto">
-                  Tudo o que você precisa para gerenciar seu salão em um só lugar, com estética minimalista e alta
-                  performance.
-                </p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
-                {benefits.map((item) => (
-                  <div
-                    key={item.title}
-                    className="bg-background-light p-8 rounded-2xl border border-transparent hover:border-primary/30 transition-all shadow-sm group"
-                  >
-                    <div className="text-primary mb-6 group-hover:scale-110 transition-transform duration-300">
-                      <span className="material-symbols-outlined text-4xl">{item.icon}</span>
-                    </div>
-                    <h3 className="text-lg font-bold mb-2">{item.title}</h3>
-                    <p className="text-sm text-text-muted leading-relaxed">{item.description}</p>
+      <section className="relative overflow-hidden bg-white py-20 lg:py-32">
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -right-40 -top-40 h-80 w-80 rounded-full bg-[var(--landing-primary-05)]" />
+          <div className="absolute -bottom-20 -left-20 h-60 w-60 rounded-full bg-[var(--landing-primary-05)]" />
+        </div>
+
+        <div className="relative mx-auto max-w-6xl px-4 lg:px-8">
+          <div className="mx-auto max-w-3xl text-center">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[var(--landing-primary-20)] bg-[var(--landing-primary-05)] px-4 py-1.5 text-sm font-medium text-[var(--landing-primary)]">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--landing-primary)] opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--landing-primary)]" />
+              </span>
+              Plataforma de agendamento online
+            </div>
+
+            <h1 className="font-heading text-4xl font-bold leading-tight tracking-tight text-[hsl(215_25%_15%)] md:text-5xl lg:text-6xl">
+              Agenda online simples e profissional para negócios de beleza
+            </h1>
+
+            <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-[hsl(215_16%_47%)] lg:text-xl">
+              Permita que seus clientes agendem sozinhos, 24 horas por dia, direto pelo seu link — sem confusão no WhatsApp.
+            </p>
+
+            <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+              <a
+                href="/admin/register"
+                className="inline-flex items-center justify-center rounded-lg bg-[var(--landing-primary)] px-8 py-3 text-base font-medium text-white transition-colors hover:bg-[var(--landing-primary-dark)]"
+              >
+                Testar grátis por 7 dias
+                <svg className="ml-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                  <path d="M5 12h14" />
+                  <path d="m12 5 7 7-7 7" />
+                </svg>
+              </a>
+              <a
+                href="#como-funciona"
+                className="inline-flex items-center justify-center rounded-lg border border-[hsl(214_32%_91%)] bg-transparent px-8 py-3 text-base font-medium text-[hsl(215_25%_15%)] transition-colors hover:bg-[hsl(214_32%_95%)]"
+              >
+                <svg className="mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                  <polygon points="6 3 20 12 6 21 6 3" />
+                </svg>
+                Ver como funciona
+              </a>
+            </div>
+            <p className="mt-4 text-sm text-[hsl(215_16%_47%)]">Sem cartão de crédito. Cancele quando quiser.</p>
+          </div>
+
+          <div className="mx-auto mt-16 max-w-4xl">
+            <div className="rounded-2xl border border-[hsl(214_32%_91%)] bg-white p-2 shadow-2xl shadow-[var(--landing-primary-shadow)]">
+              <div className="rounded-xl bg-[hsl(214_32%_95%)] p-6 lg:p-8">
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-heading text-lg font-semibold text-[hsl(215_25%_15%)]">Studio Bella</h3>
+                    <p className="text-sm text-[hsl(215_16%_47%)]">Selecione um horário</p>
                   </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <section className="py-24" id="como-funciona">
-            <div className="max-w-[1000px] mx-auto px-6">
-              <div className="text-center mb-16">
-                <h2 className="text-4xl font-extrabold tracking-tight">O caminho para o sucesso</h2>
-                <p className="text-text-muted mt-4">Simplificamos tudo para você focar no que importa: seu trabalho.</p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
-                <div className="hidden md:block absolute top-1/2 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-border-light to-transparent -z-10 -translate-y-12" />
-                {steps.map((step, index) => (
-                  <div key={step.title} className="flex flex-col items-center text-center group">
+                  <div className="rounded-lg bg-[var(--landing-primary-10)] px-3 py-1.5 text-sm font-medium text-[var(--landing-primary)]">
+                    Fevereiro 2026
+                  </div>
+                </div>
+                <div className="grid grid-cols-7 gap-2">
+                  {["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((day) => (
+                    <div key={day} className="py-2 text-center text-xs font-medium text-[hsl(215_16%_47%)]">
+                      {day}
+                    </div>
+                  ))}
+                  {Array.from({ length: 28 }).map((_, index) => {
+                    const day = index + 1;
+                    const highlighted = [8, 12, 15, 19, 22].includes(day);
+                    const selected = day === 12;
+                    return (
+                      <div
+                        key={day}
+                        className={[
+                          "flex h-10 items-center justify-center rounded-lg text-sm",
+                          selected
+                            ? "bg-[var(--landing-primary)] font-semibold text-white"
+                            : highlighted
+                              ? "bg-[var(--landing-primary-10)] font-medium text-[var(--landing-primary)]"
+                              : "text-[hsl(215_25%_15%)] hover:bg-[hsl(214_32%_91%)]",
+                        ].join(" ")}
+                      >
+                        {day}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-6 flex flex-wrap gap-2">
+                  {["09:00", "10:00", "11:30", "14:00", "15:30", "16:00"].map((time) => (
                     <div
+                      key={time}
                       className={[
-                        "size-16 rounded-full flex items-center justify-center text-2xl font-black mb-6 shadow-lg",
-                        index === 1
-                          ? "bg-white border-4 border-primary text-text-main"
-                          : "bg-primary text-white shadow-primary/30",
+                        "rounded-lg border px-4 py-2 text-sm font-medium",
+                        time === "14:00"
+                          ? "border-[var(--landing-primary)] bg-[var(--landing-primary)] text-white"
+                          : "border-[hsl(214_32%_91%)] bg-white text-[hsl(215_25%_15%)] hover:border-[var(--landing-primary-50)]",
                       ].join(" ")}
                     >
-                      {index + 1}
+                      {time}
                     </div>
-                    <h3 className="text-xl font-bold mb-3">{step.title}</h3>
-                    <p className="text-text-muted">{step.description}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <section className="bg-text-main py-24 text-white" id="precos">
-            <div className="max-w-[1200px] mx-auto px-6 flex flex-col items-center">
-              <div className="text-center mb-12 space-y-4">
-                <span className="text-primary font-bold uppercase tracking-tighter text-sm">Transparência total</span>
-                <h2 className="text-4xl lg:text-5xl font-extrabold tracking-tight">Invista no seu crescimento</h2>
-              </div>
-              <div className="w-full max-w-[500px] bg-[#1f2937] border border-[#2f3b4f] rounded-[2rem] p-10 relative overflow-hidden">
-                <div className="absolute top-0 right-0 bg-primary px-6 py-2 rounded-bl-2xl font-bold text-white text-xs">
-                  MAIS POPULAR
-                </div>
-                <div className="flex flex-col gap-6 text-center">
-                  <h3 className="text-2xl font-bold">Plano Profissional</h3>
-                  <div className="flex items-baseline justify-center gap-1">
-                    <span className="text-2xl font-medium">R$</span>
-                    <span className="text-7xl font-black text-primary">35</span>
-                    <span className="text-lg text-white/60">/mês</span>
-                  </div>
-                  <p className="text-white/60 text-sm">Para o primeiro profissional cadastrado</p>
-                  <div className="h-px bg-white/10 w-full my-2" />
-                  <ul className="text-left space-y-4 mb-4">
-                    {[
-                      "Agendamentos Ilimitados",
-                      "Lembretes por WhatsApp",
-                      "+ R$ 15/mês por profissional extra",
-                    ].map((item) => (
-                      <li key={item} className="flex items-center gap-3">
-                        <span className="material-symbols-outlined text-primary">
-                          {item.startsWith("+") ? "add_circle" : "check_circle"}
-                        </span>
-                        <span className={item.startsWith("+") ? "font-bold" : ""}>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <a
-                    href="/admin/register"
-                    className="bg-primary text-white py-4 rounded-xl text-lg font-bold hover:brightness-110 transition-all shadow-xl shadow-primary/10 inline-flex items-center justify-center"
-                  >
-                    Começar Teste Grátis
-                  </a>
+                  ))}
                 </div>
               </div>
             </div>
-          </section>
+          </div>
+        </div>
+      </section>
 
-          <section className="py-24 bg-white">
-            <div className="max-w-[1200px] mx-auto px-6">
-              <h2 className="text-4xl font-extrabold tracking-tight text-center mb-16">O que dizem os profissionais</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {testimonials.map((item) => (
-                  <div
-                    key={item.name}
-                    className="bg-background-light p-8 rounded-2xl border border-border-light"
-                  >
-                    <div className="flex gap-1 text-primary mb-4">
-                      {Array.from({ length: 5 }).map((_, idx) => (
-                        <span key={idx} className="material-symbols-outlined">
-                          star
-                        </span>
-                      ))}
-                    </div>
-                    <p className="text-text-muted italic mb-6">{item.quote}</p>
-                    <div className="flex items-center gap-4">
-                      <div
-                        className="size-12 rounded-full bg-gray-200"
-                        style={{
-                          backgroundImage: `url('${item.avatar}')`,
-                          backgroundSize: "cover",
-                        }}
-                      />
-                      <div>
-                        <p className="font-bold">{item.name}</p>
-                        <p className="text-xs text-primary font-semibold uppercase">{item.role}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
+      <section id="para-quem" className="bg-[hsl(210_40%_98%)] py-20 lg:py-28">
+        <div className="mx-auto max-w-6xl px-4 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="font-heading text-3xl font-bold text-[hsl(215_25%_15%)] md:text-4xl">Para quem é o Agendixx</h2>
+            <p className="mt-4 text-lg text-[hsl(215_16%_47%)]">Se você trabalha com horários, o Agendixx foi feito para você.</p>
+          </div>
 
-          <section className="py-24 max-w-[800px] mx-auto px-6">
-            <h2 className="text-3xl font-extrabold tracking-tight text-center mb-12">Dúvidas Frequentes</h2>
-            <div className="space-y-4">
-              {faqs.map((item) => (
-                <div key={item.question} className="bg-white p-6 rounded-xl border border-border-light">
-                  <h3 className="font-bold text-lg flex items-center justify-between">
-                    {item.question}
-                    <span className="material-symbols-outlined text-primary">expand_more</span>
-                  </h3>
-                  <p className="text-text-muted mt-4 text-sm leading-relaxed">{item.answer}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="py-24 bg-primary px-6">
-            <div className="max-w-[1000px] mx-auto bg-text-main rounded-[3rem] p-12 lg:p-20 text-center flex flex-col items-center gap-8 relative overflow-hidden">
+          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              { title: "Salões de beleza", desc: "Organize cortes, colorações e tratamentos em poucos cliques." },
+              { title: "Barbearias", desc: "Gerencie a agenda dos barbeiros com praticidade." },
+              { title: "Estúdios de sobrancelha", desc: "Agende design, henna e micropigmentação automaticamente." },
+              { title: "Clínicas de estética", desc: "Controle procedimentos e horários de cada profissional." },
+              { title: "Depilação", desc: "Otimize os atendimentos e evite encaixes manuais." },
+            ].map((item) => (
               <div
-                className="absolute inset-0 opacity-10"
-                style={{ backgroundImage: "radial-gradient(circle at 20% 50%, #13b6ec 0%, transparent 50%)" }}
-              />
-              <h2 className="text-4xl lg:text-6xl font-black text-white tracking-tight leading-tight">
-                Coloque seu salão no mundo digital hoje mesmo.
-              </h2>
-              <p className="text-white/70 text-lg max-w-xl">
-                Junte-se a milhares de profissionais que economizam tempo e aumentam seu faturamento com a Agendixx.
+                key={item.title}
+                className="group rounded-xl border border-[hsl(214_32%_91%)] bg-white p-6 transition-all hover:border-[var(--landing-primary-30)] hover:shadow-lg hover:shadow-[var(--landing-primary-05)]"
+              >
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--landing-primary-10)] text-[var(--landing-primary)] transition-colors group-hover:bg-[var(--landing-primary)] group-hover:text-white">
+                  <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                    <circle cx="6" cy="6" r="3" />
+                    <path d="M8.12 8.12 12 12" />
+                    <circle cx="18" cy="18" r="3" />
+                    <path d="M18 6v.01" />
+                  </svg>
+                </div>
+                <h3 className="font-heading text-lg font-semibold text-[hsl(215_25%_15%)]">{item.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-[hsl(215_16%_47%)]">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white py-20 lg:py-28">
+        <div className="mx-auto max-w-6xl px-4 lg:px-8">
+          <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-20">
+            <div>
+              <h2 className="font-heading text-3xl font-bold text-[hsl(215_25%_15%)] md:text-4xl">O problema que resolvemos</h2>
+              <p className="mt-4 text-lg leading-relaxed text-[hsl(215_16%_47%)]">
+                Sabemos como é difícil gerenciar uma agenda manualmente. Confusão, erros e perda de clientes fazem parte da rotina.
               </p>
-              <div className="flex flex-wrap justify-center gap-4">
+
+              <ul className="mt-8 flex flex-col gap-4">
+                {[
+                  "Agenda desorganizada ou no papel",
+                  "Mensagens no WhatsApp o dia todo",
+                  "Clientes esquecem o horário",
+                  "Dificuldade para visualizar a semana ou o mês",
+                  "Erros de agendamento",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-3">
+                    <svg className="mt-0.5 h-5 w-5 shrink-0 text-[hsl(0_84%_60%)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="m15 9-6 6" />
+                      <path d="m9 9 6 6" />
+                    </svg>
+                    <span className="text-[hsl(215_25%_15%)]">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="relative">
+              <div className="rounded-2xl border border-[var(--landing-primary-20)] bg-[var(--landing-primary-05)] p-8 lg:p-10">
+                <p className="font-heading text-2xl font-bold leading-snug text-[hsl(215_25%_15%)] md:text-3xl">
+                  Chega de perder tempo organizando agenda. Deixe o Agendixx fazer isso por você.
+                </p>
+                <div className="mt-6 h-1 w-16 rounded-full bg-[var(--landing-primary)]" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="como-funciona" className="bg-[hsl(210_40%_98%)] py-20 lg:py-28">
+        <div className="mx-auto max-w-6xl px-4 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="font-heading text-3xl font-bold text-[hsl(215_25%_15%)] md:text-4xl">Como funciona</h2>
+            <p className="mt-4 text-lg text-[hsl(215_16%_47%)]">
+              Em 3 passos simples, seu negócio já está recebendo agendamentos online.
+            </p>
+          </div>
+
+          <div className="mt-14 grid gap-8 md:grid-cols-3">
+            {[
+              {
+                title: "Crie seus serviços e profissionais",
+                desc: "Cadastre os serviços oferecidos e os profissionais do seu negócio em poucos minutos.",
+                icon: (
+                  <>
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                    <path d="M12 11h4" />
+                    <path d="M12 16h4" />
+                    <path d="M8 11h.01" />
+                    <path d="M8 16h.01" />
+                  </>
+                ),
+              },
+              {
+                title: "Compartilhe o link do seu salão",
+                desc: "Envie o link exclusivo para seus clientes via WhatsApp, Instagram ou redes sociais.",
+                icon: (
+                  <>
+                    <circle cx="18" cy="5" r="3" />
+                    <circle cx="6" cy="12" r="3" />
+                    <circle cx="18" cy="19" r="3" />
+                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                  </>
+                ),
+              },
+              {
+                title: "Receba agendamentos automáticos",
+                desc: "Seus clientes agendam sozinhos, 24h por dia. Sem precisar de nenhuma mensagem.",
+                icon: (
+                  <>
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                    <path d="m9 16 2 2 4-4" />
+                  </>
+                ),
+              },
+            ].map((step, index) => (
+              <div key={step.title} className="relative text-center">
+                {index < 2 ? (
+                  <div className="absolute left-1/2 top-12 hidden h-0.5 w-full bg-[hsl(214_32%_91%)] md:block" />
+                ) : null}
+                <div className="relative mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-2xl bg-[var(--landing-primary-10)]">
+                  <svg className="h-10 w-10 text-[var(--landing-primary)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                    {step.icon}
+                  </svg>
+                  <span className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--landing-primary)] text-sm font-bold text-white">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                </div>
+                <h3 className="font-heading text-lg font-semibold text-[hsl(215_25%_15%)]">{step.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-[hsl(215_16%_47%)]">{step.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="funcionalidades" className="bg-white py-20 lg:py-28">
+        <div className="mx-auto max-w-6xl px-4 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="font-heading text-3xl font-bold text-[hsl(215_25%_15%)] md:text-4xl">Principais funcionalidades</h2>
+            <p className="mt-4 text-lg text-[hsl(215_16%_47%)]">Tudo o que você precisa para organizar seu negócio em um só lugar.</p>
+          </div>
+
+          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              {
+                title: "Agenda semanal e mensal",
+                desc: "Visualize todos os agendamentos da semana ou do mês em um só lugar.",
+              },
+              {
+                title: "Serviços e profissionais",
+                desc: "Cadastre quantos serviços e profissionais precisar de forma simples.",
+              },
+              {
+                title: "Link exclusivo do salão",
+                desc: "Compartilhe um link personalizado para seus clientes agendarem online.",
+              },
+              {
+                title: "Reservas automáticas 24h",
+                desc: "Receba agendamentos a qualquer hora, mesmo fora do horário comercial.",
+              },
+              {
+                title: "Visual simples e fácil",
+                desc: "Interface intuitiva para você e seus clientes, sem complicação.",
+              },
+              {
+                title: "Organização total",
+                desc: "Tenha controle completo da agenda e nunca mais perca um horário.",
+              },
+            ].map((feature) => (
+              <div
+                key={feature.title}
+                className="flex gap-4 rounded-xl border border-[hsl(214_32%_91%)] bg-[hsl(210_40%_98%)] p-6 transition-all hover:border-[var(--landing-primary-30)] hover:shadow-lg hover:shadow-[var(--landing-primary-05)]"
+              >
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[var(--landing-primary-10)] text-[var(--landing-primary)]">
+                  <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-heading font-semibold text-[hsl(215_25%_15%)]">{feature.title}</h3>
+                  <p className="mt-1.5 text-sm leading-relaxed text-[hsl(215_16%_47%)]">{feature.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-[hsl(210_40%_98%)] py-20 lg:py-28">
+        <div className="mx-auto max-w-6xl px-4 lg:px-8">
+          <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-20">
+            <div className="relative order-2 lg:order-1">
+              <div className="rounded-2xl border border-[var(--landing-primary-20)] bg-[var(--landing-primary)] p-8 lg:p-10">
+                <p className="font-heading text-2xl font-bold leading-snug text-white md:text-3xl">O cliente agenda. Você só atende.</p>
+                <div className="mt-6 h-1 w-16 rounded-full bg-[rgba(255,255,255,0.3)]" />
+              </div>
+            </div>
+
+            <div className="order-1 lg:order-2">
+              <h2 className="font-heading text-3xl font-bold text-[hsl(215_25%_15%)] md:text-4xl">
+                Benefícios claros para o seu negócio
+              </h2>
+              <p className="mt-4 text-lg leading-relaxed text-[hsl(215_16%_47%)]">
+                Pare de perder tempo com tarefas manuais. Foque no que importa: atender bem seus clientes.
+              </p>
+
+              <ul className="mt-8 flex flex-col gap-4">
+                {[
+                  "Menos mensagens no WhatsApp",
+                  "Mais organização",
+                  "Mais profissionalismo",
+                  "Menos erros de horário",
+                  "Mais tempo para atender clientes",
+                ].map((item) => (
+                  <li key={item} className="flex items-center gap-3">
+                    <svg className="h-5 w-5 shrink-0 text-[var(--landing-primary)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                      <path d="m9 11 3 3L22 4" />
+                    </svg>
+                    <span className="text-[hsl(215_25%_15%)] font-medium">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="precos" className="bg-white py-20 lg:py-28">
+        <div className="mx-auto max-w-6xl px-4 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="font-heading text-3xl font-bold text-[hsl(215_25%_15%)] md:text-4xl">Planos e preços</h2>
+            <p className="mt-4 text-lg text-[hsl(215_16%_47%)]">Um plano simples, sem surpresas. Tudo incluso.</p>
+          </div>
+
+          <div className="mx-auto mt-14 max-w-md">
+            <div className="relative overflow-hidden rounded-2xl border-2 border-[var(--landing-primary)] bg-white shadow-xl shadow-[var(--landing-primary-shadow)]">
+              <div className="bg-[var(--landing-primary)] px-6 py-3 text-center">
+                <span className="text-sm font-semibold text-white">7 dias grátis — Plano Agendixx</span>
+              </div>
+
+              <div className="p-8 lg:p-10">
+                <div className="text-center">
+                  <div className="flex items-baseline justify-center gap-1">
+                    <span className="text-sm font-medium text-[hsl(215_16%_47%)]">R$</span>
+                    <span className="font-heading text-5xl font-bold text-[hsl(215_25%_15%)]">49,90</span>
+                    <span className="text-sm font-medium text-[hsl(215_16%_47%)]">/ mês</span>
+                  </div>
+                </div>
+
+                <ul className="mt-8 flex flex-col gap-3">
+                  {[
+                    "Até 2 profissionais (2 agendas)",
+                    "Agendamentos ilimitados",
+                    "Agenda semanal e mensal",
+                    "Link exclusivo do salão",
+                    "Suporte básico",
+                  ].map((item) => (
+                    <li key={item} className="flex items-center gap-3">
+                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--landing-primary-10)]">
+                        <svg className="h-3.5 w-3.5 text-[var(--landing-primary)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="3" stroke="currentColor">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      </div>
+                      <span className="text-[hsl(215_25%_15%)]">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="mt-6 rounded-lg bg-[hsl(214_32%_95%)] p-4">
+                  <p className="text-sm text-[hsl(215_25%_15%)]">
+                    <span className="font-semibold">Profissional extra:</span> R$ 15,00 por mês
+                  </p>
+                </div>
+
                 <a
                   href="/admin/register"
-                  className="bg-primary text-white h-16 px-10 rounded-2xl text-xl font-black hover:scale-[1.05] transition-transform inline-flex items-center justify-center"
+                  className="mt-8 flex w-full items-center justify-center rounded-lg bg-[var(--landing-primary)] px-6 py-3 text-base font-medium text-white transition-colors hover:bg-[var(--landing-primary-dark)]"
                 >
-                  Começar agora mesmo
+                  Testar grátis por 7 dias
+                  <svg className="ml-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                    <path d="M5 12h14" />
+                    <path d="m12 5 7 7-7 7" />
+                  </svg>
                 </a>
-              </div>
-              <p className="text-white/60 text-sm font-semibold">Sem necessidade de cartão de crédito para testar.</p>
-            </div>
-          </section>
-        </main>
 
-        <footer className="bg-background-light border-t border-border-light py-12 px-6 lg:px-10">
-          <div className="max-w-[1200px] mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
-            <div className="space-y-6">
-              <div className="flex items-center">
-                <div className="inline-flex items-center justify-center">
-                  <Image
-                    src="/logo-axk.png"
-                    alt="Agendixx"
-                    width={300}
-                    height={64}
-                    className="h-8 w-[140px] object-contain"
-                  />
-                </div>
+                <p className="mt-4 text-center text-sm text-[hsl(215_16%_47%)]">
+                  Sem cartão de crédito. Sem taxa por agendamento. Cancele quando quiser.
+                </p>
               </div>
-              <p className="text-sm text-text-muted leading-relaxed">
-                Simplificando o agendamento de serviços de beleza e bem-estar no Brasil.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-bold mb-4 uppercase text-xs tracking-widest text-primary">Produto</h4>
-              <ul className="space-y-3 text-sm font-medium">
-                <li>
-                  <a className="hover:text-primary" href="#beneficios">
-                    Funcionalidades
-                  </a>
-                </li>
-                <li>
-                  <a className="hover:text-primary" href="#precos">
-                    Preços
-                  </a>
-                </li>
-                <li>
-                  <a className="hover:text-primary" href="#">
-                    Blog
-                  </a>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-bold mb-4 uppercase text-xs tracking-widest text-primary">Suporte</h4>
-              <ul className="space-y-3 text-sm font-medium">
-                <li>
-                  <a className="hover:text-primary" href="#">
-                    Central de Ajuda
-                  </a>
-                </li>
-                <li>
-                  <a className="hover:text-primary" href="https://wa.me/5500000000000">
-                    WhatsApp
-                  </a>
-                </li>
-                <li>
-                  <a className="hover:text-primary" href="#">
-                    Status
-                  </a>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-bold mb-4 uppercase text-xs tracking-widest text-primary">Legal</h4>
-              <ul className="space-y-3 text-sm font-medium">
-                <li>
-                  <a className="hover:text-primary" href="#">
-                    Termos de Uso
-                  </a>
-                </li>
-                <li>
-                  <a className="hover:text-primary" href="#">
-                    Privacidade
-                  </a>
-                </li>
-              </ul>
             </div>
           </div>
-          <div className="max-w-[1200px] mx-auto mt-12 pt-8 border-t border-border-light flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-text-muted">
-            <p>© 2026 Agendixx Software de Agendamento Ltda.</p>
-            <div className="flex gap-6">
-              <a className="hover:text-primary transition-colors" href="#">
-                Instagram
-              </a>
-              <a className="hover:text-primary transition-colors" href="#">
-                LinkedIn
-              </a>
-              <a className="hover:text-primary transition-colors" href="#">
-                Twitter
-              </a>
-            </div>
+        </div>
+      </section>
+
+      <section className="bg-[hsl(210_40%_98%)] py-20 lg:py-28">
+        <div className="mx-auto max-w-6xl px-4 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="font-heading text-3xl font-bold text-[hsl(215_25%_15%)] md:text-4xl">
+              Confiança para o seu negócio
+            </h2>
+            <p className="mt-4 text-lg text-[hsl(215_16%_47%)]">
+              Plataforma simples, segura e pensada para pequenos negócios de beleza.
+            </p>
           </div>
-        </footer>
-      </div>
-    </div>
+
+          <div className="mt-14 grid gap-8 md:grid-cols-3">
+            {[
+              { title: "Segura", desc: "Seus dados e os dos seus clientes protegidos." },
+              { title: "Simples", desc: "Feita para quem não é de tecnologia." },
+              { title: "Para pequenos negócios", desc: "Pensada especialmente para profissionais de beleza." },
+            ].map((item) => (
+              <div key={item.title} className="text-center">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--landing-primary-10)] text-[var(--landing-primary)]">
+                  <svg className="h-7 w-7" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                    <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+                  </svg>
+                </div>
+                <h3 className="font-heading text-lg font-semibold text-[hsl(215_25%_15%)]">{item.title}</h3>
+                <p className="mt-2 text-sm text-[hsl(215_16%_47%)]">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-[var(--landing-primary)] py-20 lg:py-28">
+        <div className="mx-auto max-w-6xl px-4 text-center lg:px-8">
+          <h2 className="font-heading text-3xl font-bold text-white md:text-4xl lg:text-5xl">
+            Comece hoje a organizar sua agenda
+          </h2>
+          <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-[rgba(255,255,255,0.8)]">
+            Em poucos minutos seu salão já pode receber agendamentos online. Teste grátis por 7 dias.
+          </p>
+          <a
+            href="/admin/register"
+            className="mt-10 inline-flex items-center justify-center rounded-lg bg-[hsl(214_32%_91%)] px-10 py-3 text-base font-semibold text-[hsl(215_25%_15%)] transition-colors hover:bg-[hsl(214_32%_80%)]"
+          >
+            Testar grátis por 7 dias
+            <svg className="ml-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+              <path d="M5 12h14" />
+              <path d="m12 5 7 7-7 7" />
+            </svg>
+          </a>
+          <p className="mt-4 text-sm text-[rgba(255,255,255,0.6)]">Sem cartão de crédito. Cancele quando quiser.</p>
+        </div>
+      </section>
+
+      <footer className="border-t border-[hsl(214_32%_91%)] bg-white py-10">
+        <div className="mx-auto max-w-6xl px-4 lg:px-8">
+          <div className="flex flex-col items-center gap-4 md:flex-row md:justify-between">
+            <div className="flex items-center">
+              <Image
+                src="/logo-axk.png"
+                alt="Agendixx"
+                width={260}
+                height={96}
+                className="h-auto w-[140px] object-contain"
+              />
+            </div>
+            <p className="text-sm text-[hsl(215_16%_47%)]">Plataforma de agendamento online para negócios de beleza</p>
+            <p className="text-sm text-[hsl(215_16%_47%)]">© 2026 Agendixx. Todos os direitos reservados.</p>
+          </div>
+        </div>
+      </footer>
+    </main>
   );
 }
