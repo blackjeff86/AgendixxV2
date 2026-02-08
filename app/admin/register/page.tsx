@@ -3,8 +3,8 @@
  import React, { useState } from "react";
  import Link from "next/link";
  import { useRouter } from "next/navigation";
- import { createUserWithEmailAndPassword } from "firebase/auth";
- import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
  import { auth, db } from "@/lib/firebase";
  
  function slugifyName(input: string) {
@@ -74,6 +74,12 @@ function formatPhoneBR(value: string) {
          adminUid: cred.user.uid,
          createdAt: serverTimestamp(),
          updatedAt: serverTimestamp(),
+       });
+
+       await setDoc(doc(db, "users_admin", cred.user.uid), {
+         tenantId: slug,
+         email,
+         createdAt: serverTimestamp(),
        });
  
       alert("Cadastro criado com sucesso! Você será direcionado ao painel.");

@@ -1,13 +1,15 @@
 "use client";
 
 import React, { useEffect, useMemo, useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   addDoc,
   arrayRemove,
   arrayUnion,
   collection,
   doc,
+  getDoc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
@@ -15,8 +17,10 @@ import {
   updateDoc,
   where,
   Timestamp,
+  limit,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 type TeamMember = {
   id: string;
@@ -236,6 +240,7 @@ export default function AdminDashboardPage() {
 }
 
 function AdminDashboardInner() {
+  const router = useRouter();
   /**
    * ✅ IMPORTANTE (por enquanto):
    * Defina aqui qual tenant este admin controla.
@@ -243,18 +248,61 @@ function AdminDashboardInner() {
    * ex: users_admin/{uid}.tenantId
    */
   const searchParams = useSearchParams();
-  const tenantFromUrl = searchParams.get("tenant") || "bella-studio";
-  const [tenantId, setTenantId] = useState<string>(tenantFromUrl);
+  const tenantFromUrl = searchParams.get("tenant");
+  const [tenantId, setTenantId] = useState<string>("");
+  const [authReady, setAuthReady] = useState(false);
+  const [currentUid, setCurrentUid] = useState<string | null>(null);
 
   useEffect(() => {
-    setTenantId(tenantFromUrl);
-  }, [tenantFromUrl]);
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setCurrentUid(user?.uid ?? null);
+      setAuthReady(true);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (!authReady) return;
+    if (!currentUid) {
+      router.replace("/admin/login");
+      return;
+    }
+
+    (async () => {
+      // 1) prioridade: users_admin/{uid}
+      const adminRef = doc(db, "users_admin", currentUid);
+      const adminSnap = await getDoc(adminRef);
+      if (adminSnap.exists()) {
+        const data = adminSnap.data() as any;
+        const tid = String(data?.tenantId ?? "");
+        if (tid) {
+          setTenantId(tid);
+          return;
+        }
+      }
+
+      // 2) fallback: tenant com adminUid == uid
+      const tenantsRef = collection(db, "tenants");
+      const q = query(tenantsRef, where("adminUid", "==", currentUid), limit(1));
+      const snap = await getDocs(q);
+      const first = snap.docs[0];
+      if (first) {
+        setTenantId(first.id);
+        return;
+      }
+
+      // 3) fallback opcional via query string (caso venha do cadastro)
+      if (tenantFromUrl) {
+        setTenantId(tenantFromUrl);
+      }
+    })();
+  }, [authReady, currentUid, router, tenantFromUrl]);
 
   // ===== Tenant (salão) =====
   const [salonName, setSalonName] = useState<string>("Carregando...");
   const [tenantSlug, setTenantSlug] = useState<string>(tenantId);
 
-  const bookingLink = useMemo(() => `agendix.me/${tenantSlug}`, [tenantSlug]);
+  const bookingLink = useMemo(() => `https://repoagendixx.pages.dev/s/${tenantSlug}`, [tenantSlug]);
 
   // ===== Dados Firestore =====
   const [team, setTeam] = useState<TeamMember[]>([]);
@@ -422,6 +470,7 @@ function AdminDashboardInner() {
 
   // ===== Firestore: subscriptions =====
   useEffect(() => {
+    if (!tenantId) return;
     let alive = true;
     setLoading(true);
 
@@ -981,6 +1030,10 @@ function AdminDashboardInner() {
     ],
     []
   );
+
+  if (!authReady || !currentUid || !tenantId) {
+    return <div className="bg-slate-50 text-slate-900 min-h-screen" />;
+  }
 
   return (
     <div className="bg-slate-50 text-slate-900 min-h-screen">

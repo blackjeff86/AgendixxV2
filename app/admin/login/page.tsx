@@ -2,22 +2,29 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 export default function AdminLoginPage() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorVisible, setErrorVisible] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-  function onSubmit() {
-    // Mantém funcionalidade do template: loading + erro
+  async function onSubmit() {
     setLoading(true);
     setErrorVisible(false);
-
-    setTimeout(() => {
-      setLoading(false);
-      // mock de erro (trocaremos por Firebase Auth depois)
+    try {
+      await signInWithEmailAndPassword(auth, email.trim(), password);
+      router.push("/admin");
+    } catch {
       setErrorVisible(true);
-    }, 800);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -48,7 +55,8 @@ export default function AdminLoginPage() {
                 className="form-input flex w-full rounded-xl text-text-main focus:outline-0 focus:ring-4 focus:ring-primary/10 border border-border-light bg-surface-light focus:border-primary h-14 placeholder:text-text-muted/60 pl-12 pr-4 text-base font-normal leading-normal transition-all"
                 placeholder="nome@empresa.com"
                 type="email"
-                defaultValue=""
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
           </div>
@@ -66,7 +74,8 @@ export default function AdminLoginPage() {
                 className="form-input flex w-full rounded-xl text-text-main focus:outline-0 focus:ring-4 focus:ring-primary/10 border border-border-light bg-surface-light focus:border-primary h-14 placeholder:text-text-muted/60 pl-12 pr-12 text-base font-normal leading-normal transition-all"
                 placeholder="••••••••"
                 type={showPassword ? "text" : "password"}
-                defaultValue=""
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
               />
               <button
                 type="button"
