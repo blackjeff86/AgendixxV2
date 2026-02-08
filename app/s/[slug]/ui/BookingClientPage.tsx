@@ -1156,6 +1156,7 @@ export default function BookingClientPage({ slug }: { slug?: string }) {
               holdSessionId: (b?.holdSessionId as string | null | undefined) ?? null,
               clientId: String(b?.clientId ?? ""),
               serviceId: String(b?.serviceId ?? ""),
+              customerPhone: String(b?.customerPhone ?? ""),
             };
           })
           .filter((b) => b?.startAt);
