@@ -94,13 +94,13 @@ export default function Home() {
         <header className="sticky top-0 z-50 w-full bg-background-light/90 backdrop-blur-md border-b border-border-light px-6 lg:px-10 py-3">
           <div className="flex items-center justify-between max-w-[1200px] mx-auto">
             <div className="flex items-center gap-2">
-              <div className="size-8">
+              <div className="size-10">
                 <Image
                   src="/logo-axk.png"
                   alt="Agendixx"
-                  width={32}
-                  height={32}
-                  className="h-8 w-8 object-contain"
+                  width={40}
+                  height={40}
+                  className="h-10 w-10 object-contain"
                   priority
                 />
               </div>
@@ -116,12 +116,20 @@ export default function Home() {
               <a className="text-sm font-semibold hover:text-primary transition-colors" href="#precos">
                 Preços
               </a>
-              <a
-                href="/admin/register"
-                className="bg-primary text-white px-5 py-2.5 rounded-lg text-sm font-bold hover:brightness-110 transition-all inline-flex items-center justify-center"
-              >
-                Quero testar agora
-              </a>
+              <div className="flex items-center gap-3">
+                <a
+                  href="/admin/register"
+                  className="bg-primary text-white px-5 py-2.5 rounded-lg text-sm font-bold hover:brightness-110 transition-all inline-flex items-center justify-center"
+                >
+                  Quero testar agora
+                </a>
+                <a
+                  href="/admin/login"
+                  className="bg-white border border-border-light px-5 py-2.5 rounded-lg text-sm font-bold text-text-main hover:bg-slate-50 transition-all inline-flex items-center justify-center"
+                >
+                  Login admin
+                </a>
+              </div>
             </nav>
           </div>
         </header>
@@ -350,10 +358,14 @@ export default function Home() {
           <div className="max-w-[1200px] mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
             <div className="space-y-6">
               <div className="flex items-center gap-2">
-                <div className="size-6 text-primary">
-                  <svg fill="currentColor" viewBox="0 0 48 48">
-                    <path d="M36.7273 44C33.9891 44 31.6043 39.8386 30.3636 33.69C29.123 39.8386 26.7382 44 24 44C21.2618 44 18.877 39.8386 17.6364 33.69C16.3957 39.8386 14.0109 44 11.2727 44C7.25611 44 4 35.0457 4 24C4 12.9543 7.25611 4 11.2727 4C14.0109 4 16.3957 8.16144 17.6364 14.31C18.877 8.16144 21.2618 4 24 4C26.7382 4 29.123 8.16144 30.3636 14.31C31.6043 8.16144 33.9891 4 36.7273 4C40.7439 4 44 12.9543 44 24C44 35.0457 40.7439 44 36.7273 44Z" />
-                  </svg>
+                <div className="size-8">
+                  <Image
+                    src="/logo-axk.png"
+                    alt="Agendixx"
+                    width={32}
+                    height={32}
+                    className="h-8 w-8 object-contain"
+                  />
                 </div>
                 <h2 className="text-lg font-black tracking-tight">Agendixx</h2>
               </div>
