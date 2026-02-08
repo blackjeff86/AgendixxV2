@@ -20,7 +20,7 @@ import {
   limit,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 
 type TeamMember = {
   id: string;
@@ -1002,6 +1002,14 @@ function AdminDashboardInner() {
     }
   }
 
+  async function handleSignOut() {
+    try {
+      await signOut(auth);
+    } finally {
+      router.replace("/admin/login");
+    }
+  }
+
   // default do filtro quando team muda
   useEffect(() => {
     if (selectedFilter === "all") return;
@@ -1061,6 +1069,14 @@ function AdminDashboardInner() {
             </button>
             <button className="flex items-center justify-center rounded-xl h-10 w-10 bg-slate-50 text-slate-600 border border-slate-100">
               <span className="material-symbols-outlined text-[20px]">settings</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="flex items-center justify-center rounded-xl h-10 w-10 bg-slate-50 text-slate-600 border border-slate-100"
+              aria-label="Sair"
+            >
+              <span className="material-symbols-outlined text-[20px]">logout</span>
             </button>
           </div>
         </header>

@@ -94,13 +94,13 @@ export default function Home() {
         <header className="sticky top-0 z-50 w-full bg-background-light/90 backdrop-blur-md border-b border-border-light px-6 lg:px-10 py-3">
           <div className="flex items-center justify-between max-w-[1200px] mx-auto">
             <div className="flex items-center gap-2">
-              <div className="size-10">
+              <div className="inline-flex items-center justify-center">
                 <Image
                   src="/logo-axk.png"
                   alt="Agendixx"
-                  width={40}
-                  height={40}
-                  className="h-10 w-10 object-contain"
+                  width={28}
+                  height={28}
+                  className="h-[1em] w-[1em] object-contain"
                   priority
                 />
               </div>
@@ -430,7 +430,7 @@ export default function Home() {
             </div>
           </div>
           <div className="max-w-[1200px] mx-auto mt-12 pt-8 border-t border-border-light flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-text-muted">
-            <p>© 2024 Agendixx Software de Agendamento Ltda.</p>
+            <p>© 2025 Agendixx Software de Agendamento Ltda.</p>
             <div className="flex gap-6">
               <a className="hover:text-primary transition-colors" href="#">
                 Instagram
