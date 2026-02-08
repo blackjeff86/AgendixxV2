@@ -93,18 +93,17 @@ export default function Home() {
       <div className="relative flex min-h-screen w-full flex-col overflow-x-hidden">
         <header className="sticky top-0 z-50 w-full bg-background-light/90 backdrop-blur-md border-b border-border-light px-6 lg:px-10 py-3">
           <div className="flex items-center justify-between max-w-[1200px] mx-auto">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center">
               <div className="inline-flex items-center justify-center">
                 <Image
                   src="/logo-axk.png"
                   alt="Agendixx"
-                  width={28}
-                  height={28}
-                  className="h-[1em] w-[1em] object-contain"
+                  width={360}
+                  height={80}
+                  className="h-10 w-[180px] object-contain"
                   priority
                 />
               </div>
-              <h2 className="text-xl font-extrabold tracking-tight">Agendixx</h2>
             </div>
             <nav className="hidden md:flex items-center gap-8">
               <a className="text-sm font-semibold hover:text-primary transition-colors" href="#beneficios">
@@ -357,17 +356,16 @@ export default function Home() {
         <footer className="bg-background-light border-t border-border-light py-12 px-6 lg:px-10">
           <div className="max-w-[1200px] mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
             <div className="space-y-6">
-              <div className="flex items-center gap-2">
-                <div className="size-8">
+              <div className="flex items-center">
+                <div className="inline-flex items-center justify-center">
                   <Image
                     src="/logo-axk.png"
                     alt="Agendixx"
-                    width={32}
-                    height={32}
-                    className="h-8 w-8 object-contain"
+                    width={300}
+                    height={64}
+                    className="h-8 w-[140px] object-contain"
                   />
                 </div>
-                <h2 className="text-lg font-black tracking-tight">Agendixx</h2>
               </div>
               <p className="text-sm text-text-muted leading-relaxed">
                 Simplificando o agendamento de serviços de beleza e bem-estar no Brasil.
@@ -430,7 +428,7 @@ export default function Home() {
             </div>
           </div>
           <div className="max-w-[1200px] mx-auto mt-12 pt-8 border-t border-border-light flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-text-muted">
-            <p>© 2025 Agendixx Software de Agendamento Ltda.</p>
+            <p>© 2026 Agendixx Software de Agendamento Ltda.</p>
             <div className="flex gap-6">
               <a className="hover:text-primary transition-colors" href="#">
                 Instagram
