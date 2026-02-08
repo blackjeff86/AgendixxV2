@@ -425,12 +425,12 @@ export default function AdminDashboardPage() {
         if (!alive) return;
         if (!snap.exists()) {
           setSalonName("Salão não encontrado");
-          setTenantSlug(TENANT_ID);
+          setTenantSlug(tenantId);
           return;
         }
         const data = snap.data() as any;
         setSalonName(String(data?.name ?? "Salão"));
-        setTenantSlug(String(data?.slug ?? TENANT_ID));
+        setTenantSlug(String(data?.slug ?? tenantId));
       },
       () => {
         if (!alive) return;
@@ -769,13 +769,13 @@ export default function AdminDashboardPage() {
     // Atualiza serviços adicionando/removendo o uid do profissional no campo professionalIds
     await Promise.all([
       ...toAdd.map((sid) =>
-        updateDoc(doc(db, "tenants", TENANT_ID, "services", sid), {
+        updateDoc(doc(db, "tenants", tenantId, "services", sid), {
           professionalIds: arrayUnion(proId),
           updatedAt: serverTimestamp(),
         })
       ),
       ...toRemove.map((sid) =>
-        updateDoc(doc(db, "tenants", TENANT_ID, "services", sid), {
+        updateDoc(doc(db, "tenants", tenantId, "services", sid), {
           professionalIds: arrayRemove(proId),
           updatedAt: serverTimestamp(),
         })
