@@ -74,6 +74,20 @@ type ServiceItem = {
   professionalIds: string[]; // relacionamento
 };
 
+type OpeningHour = {
+  dayIndex: number; // 0=Dom ... 6=Sáb
+  label: string;
+  active: boolean;
+  start: string; // "09:00"
+  end: string; // "18:00"
+};
+
+type ClosedDate = {
+  id: string;
+  date: string; // YYYY-MM-DD
+  label: string;
+};
+
 function startOfWeekMonday(d: Date) {
   const date = new Date(d);
   const day = date.getDay(); // 0=Dom
@@ -160,6 +174,17 @@ function formatAbsenceLabel(kind: "ausencia" | "ferias", startAt: Timestamp | nu
   return `${start} a ${end}`;
 }
 
+function buildDefaultOpeningHours(): OpeningHour[] {
+  const labels = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+  return labels.map((label, dayIndex) => ({
+    dayIndex,
+    label,
+    active: dayIndex !== 0,
+    start: "09:00",
+    end: "18:00",
+  }));
+}
+
 function normalizeWorkingDays(value: any): number[] {
   if (!Array.isArray(value)) return [1, 2, 3, 4, 5]; // default Seg-Sex
   return value
@@ -183,6 +208,16 @@ function bookingStatusLabel(status?: string) {
   if (status === "cancelled") return "Cancelado";
   if (status === "completed") return "Finalizado";
   return "Confirmado";
+}
+
+function formatPhoneBR(value: string) {
+  const digits = String(value ?? "").replace(/\D/g, "").slice(0, 11);
+  if (!digits) return "";
+  const ddd = digits.slice(0, 2);
+  const rest = digits.slice(2);
+  if (rest.length <= 4) return `(${ddd}) ${rest}`;
+  if (rest.length <= 9) return `(${ddd}) ${rest.slice(0, 4)}-${rest.slice(4)}`;
+  return `(${ddd}) ${rest.slice(0, 5)}-${rest.slice(5, 9)}`;
 }
 
 function ModalShell({
@@ -301,6 +336,11 @@ function AdminDashboardInner() {
   // ===== Tenant (salão) =====
   const [salonName, setSalonName] = useState<string>("Carregando...");
   const [tenantSlug, setTenantSlug] = useState<string>(tenantId);
+  const [tenantForm, setTenantForm] = useState({ name: "", phone: "", email: "", address: "" });
+  const [openingHours, setOpeningHours] = useState<OpeningHour[]>(() => buildDefaultOpeningHours());
+  const [closedDates, setClosedDates] = useState<ClosedDate[]>([]);
+  const [closedDateInput, setClosedDateInput] = useState<string>("");
+  const [closedLabelInput, setClosedLabelInput] = useState<string>("");
 
   const bookingLink = useMemo(() => `https://repoagendixx.pages.dev/s/${tenantSlug}`, [tenantSlug]);
 
@@ -312,6 +352,7 @@ function AdminDashboardInner() {
   const [loading, setLoading] = useState<boolean>(true);
   const [viewMode, setViewMode] = useState<"week" | "month">("week");
   const [dashboardRange, setDashboardRange] = useState<"week" | "month">("week");
+  const [activeView, setActiveView] = useState<"settings" | "appointments">("settings");
 
   // ===== UI state (mantém funcionalidades) =====
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
@@ -488,6 +529,34 @@ function AdminDashboardInner() {
         const data = snap.data() as any;
         setSalonName(String(data?.name ?? "Salão"));
         setTenantSlug(String(data?.slug ?? tenantId));
+        setTenantForm({
+          name: String(data?.name ?? ""),
+          phone: String(data?.phone ?? ""),
+          email: String(data?.adminEmail ?? ""),
+          address: String(data?.address ?? ""),
+        });
+        const storedHours = Array.isArray(data?.openingHours) ? (data.openingHours as any[]) : null;
+        setOpeningHours(
+          storedHours
+            ? storedHours
+                .map((h) => ({
+                  dayIndex: Number(h?.dayIndex ?? 0),
+                  label: String(h?.label ?? ""),
+                  active: Boolean(h?.active ?? true),
+                  start: String(h?.start ?? "09:00"),
+                  end: String(h?.end ?? "18:00"),
+                }))
+                .sort((a, b) => a.dayIndex - b.dayIndex)
+            : buildDefaultOpeningHours()
+        );
+        const storedClosed = Array.isArray(data?.closedDates) ? (data.closedDates as any[]) : [];
+        setClosedDates(
+          storedClosed.map((c, idx) => ({
+            id: String(c?.id ?? `${c?.date ?? idx}-${idx}`),
+            date: String(c?.date ?? ""),
+            label: String(c?.label ?? ""),
+          }))
+        );
       },
       () => {
         if (!alive) return;
@@ -709,6 +778,32 @@ function AdminDashboardInner() {
   async function copyLink() {
     await navigator.clipboard.writeText(bookingLink);
     alert("Link copiado!");
+  }
+
+  async function saveTenantData() {
+    if (!tenantId) return;
+    const name = tenantForm.name.trim();
+    if (!name) return alert("Informe o nome do salão.");
+    try {
+      const normalizedClosedDates = closedDates
+        .filter((c) => c.date)
+        .map((c, idx) => ({
+          id: c.id || `${c.date}-${idx}`,
+          date: c.date,
+          label: c.label,
+        }));
+      await updateDoc(doc(db, "tenants", tenantId), {
+        name,
+        phone: tenantForm.phone.trim(),
+        adminEmail: tenantForm.email.trim(),
+        address: tenantForm.address.trim(),
+        openingHours,
+        closedDates: normalizedClosedDates,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (e: any) {
+      alert(e?.message ?? "Erro ao salvar dados do salão.");
+    }
   }
 
   // ===== SERVICES (CRUD via modal) =====
@@ -1044,297 +1139,483 @@ function AdminDashboardInner() {
   }
 
   return (
-    <div className="bg-slate-50 text-slate-900 min-h-screen">
-      <div className="relative flex min-h-screen w-full flex-col bg-slate-50 pb-8">
-        {/* Header */}
-        <header className="sticky top-0 z-50 flex items-center bg-white/90 backdrop-blur-md px-4 py-4 justify-between border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <div
-              className="bg-center bg-no-repeat aspect-square bg-cover rounded-2xl size-11 border border-slate-100 shadow-sm"
-              style={{
-                backgroundImage:
-                  'url("https://lh3.googleusercontent.com/aida-public/AB6AXuAFf0PZcFpMoTn0xw3OkUBejkEi_eErwwSmtgV6IgIFxk3ZOHxOS4PA69L52fCGDAnBqlV2QCXP6EBBU1VDOfEkvUdshDnwngpAfbfVM_KH9THoGrtTziSpalkVQ5BJHjXcW6VUhnMcRdfiqGAeYJF7JPwoNugo0CRNkll569WO4oYgDpwccidt_TG2vz5GqFxgdN_BV4QWVA4eyHYMfvF5GvLwtHmlPwWxFJ00mC3fsxTKrnP5dSY-4IoLayR0DnbPNzjuRnEKS0g")',
-              }}
-            />
-            <div className="flex flex-col">
-              <h2 className="text-slate-900 text-base font-extrabold leading-tight tracking-tight">{salonName}</h2>
-              <span className="text-[10px] font-bold text-primary uppercase tracking-wider">Painel Admin</span>
-              {loading && <span className="text-[10px] font-semibold text-slate-400">Carregando dados...</span>}
-            </div>
+    <div className="bg-background-light text-slate-900 min-h-screen">
+      <header className="sticky top-0 z-50 bg-background-light/80 backdrop-blur-md border-b border-slate-200">
+        <div className="flex flex-col items-center p-4 gap-2">
+          <img src="/logo-axk.png" alt="Agendixx" className="h-8 w-auto object-contain" />
+          <div className="flex flex-col items-center">
+            <h2 className="text-[#0d141b] text-lg font-bold leading-tight tracking-tight">{salonName}</h2>
+            <p className="text-xs text-slate-500">{tenantForm.email || "admin@agendixx.com"}</p>
           </div>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="text-red-500 text-sm font-semibold flex items-center gap-1 active:opacity-60 transition-opacity"
+          >
+            Sair
+            <span className="material-symbols-outlined text-lg">logout</span>
+          </button>
+        </div>
 
-          <div className="flex gap-2">
-            <button className="flex items-center justify-center rounded-xl h-10 w-10 bg-slate-50 text-slate-600 border border-slate-100">
-              <span className="material-symbols-outlined text-[20px]">notifications</span>
-            </button>
-            <button className="flex items-center justify-center rounded-xl h-10 w-10 bg-slate-50 text-slate-600 border border-slate-100">
-              <span className="material-symbols-outlined text-[20px]">settings</span>
+        <div className="px-4 pb-3">
+          <div className="flex h-11 items-center justify-center rounded-xl bg-slate-200/60 p-1">
+            <button
+              type="button"
+              onClick={() => setActiveView("settings")}
+              className={[
+                "flex h-full grow items-center justify-center rounded-lg px-2 text-sm font-semibold transition-all",
+                activeView === "settings"
+                  ? "bg-white shadow-sm text-primary"
+                  : "text-slate-500 text-sm font-medium",
+              ].join(" ")}
+            >
+              Configurações
             </button>
             <button
               type="button"
-              onClick={handleSignOut}
-              className="flex items-center justify-center rounded-xl h-10 w-10 bg-slate-50 text-slate-600 border border-slate-100"
-              aria-label="Sair"
+              onClick={() => setActiveView("appointments")}
+              className={[
+                "flex h-full grow items-center justify-center rounded-lg px-2 text-sm font-medium transition-all",
+                activeView === "appointments"
+                  ? "bg-white shadow-sm text-primary"
+                  : "text-slate-500",
+              ].join(" ")}
             >
-              <span className="material-symbols-outlined text-[20px]">logout</span>
-            </button>
-          </div>
-        </header>
-
-        {/* Link de agendamento */}
-        <div className="p-4">
-          <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-            <div className="flex flex-col gap-0.5">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Link de Agendamento</p>
-              <p className="text-slate-900 text-sm font-semibold">{bookingLink}</p>
-            </div>
-            <button
-              onClick={copyLink}
-              className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary transition-all active:scale-90"
-            >
-              <span className="material-symbols-outlined text-[20px]">content_copy</span>
+              Agendamentos
             </button>
           </div>
         </div>
+      </header>
 
-        {/* Configurações */}
-        <section className="px-4 py-2 space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-extrabold text-slate-800">Configurações</h3>
-            <span className="text-xs font-bold text-slate-400">Ver todas</span>
-          </div>
-
-          {/* ✅ NOVA SEÇÃO: Funções/Serviços */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">content_cut</span>
-                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Funções / Serviços</h4>
+      <main className="max-w-md mx-auto pb-24">
+        {activeView === "settings" ? (
+          <section className="p-4 space-y-6" id="settings-view">
+            <div className="space-y-4">
+              <h3 className="text-slate-900 text-sm font-bold uppercase tracking-wider">Dados do Salão</h3>
+              <div className="space-y-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-slate-700 ml-1">Nome do Salão</label>
+                  <input
+                    className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                    type="text"
+                    value={tenantForm.name}
+                    onChange={(e) => setTenantForm((p) => ({ ...p, name: e.target.value }))}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-slate-700 ml-1">Endereço do Salão</label>
+                  <input
+                    className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                    type="text"
+                    value={tenantForm.address}
+                    onChange={(e) => setTenantForm((p) => ({ ...p, address: e.target.value }))}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-slate-700 ml-1">WhatsApp de Contato</label>
+                  <input
+                    className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                    type="tel"
+                    value={tenantForm.phone}
+                    onChange={(e) => setTenantForm((p) => ({ ...p, phone: formatPhoneBR(e.target.value) }))}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-slate-700 ml-1">Email do Admin</label>
+                  <input
+                    className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                    type="email"
+                    value={tenantForm.email}
+                    onChange={(e) => setTenantForm((p) => ({ ...p, email: e.target.value }))}
+                  />
+                </div>
               </div>
-              <button
-                onClick={openCreateService}
-                className="text-[11px] font-bold text-primary bg-primary/5 px-3 py-1.5 rounded-full"
-              >
-                + Novo Serviço
-              </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-4">
-              {services.map((s) => (
-                <div key={s.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-4">
-                  <div className="flex items-center justify-between">
+            <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center gap-2 text-primary">
+                <span className="material-symbols-outlined text-lg">link</span>
+                <h4 className="font-bold text-sm uppercase tracking-wide">Link Público</h4>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 h-10 px-3 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-600 outline-none"
+                  readOnly
+                  value={bookingLink}
+                />
+                <button
+                  onClick={copyLink}
+                  className="bg-primary text-white px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-1 active:scale-95 transition-transform"
+                >
+                  <span className="material-symbols-outlined text-sm">content_copy</span>
+                  Copiar
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-500">Divulgue este link no seu Instagram.</p>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-slate-900 text-sm font-bold uppercase tracking-wider">Horários de Funcionamento</h3>
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
+                {openingHours.map((h) => (
+                  <div key={h.dayIndex} className={["p-4 flex items-center justify-between", h.active ? "" : "opacity-60"].join(" ")}>
                     <div className="flex items-center gap-3">
-                      <div className="size-12 rounded-2xl bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-50">
-                        <span className="material-symbols-outlined text-slate-400">{s.icon ?? "content_cut"}</span>
+                      <input
+                        checked={h.active}
+                        onChange={(e) =>
+                          setOpeningHours((prev) =>
+                            prev.map((x) => (x.dayIndex === h.dayIndex ? { ...x, active: e.target.checked } : x))
+                          )
+                        }
+                        className="w-5 h-5 rounded text-primary border-slate-300 focus:ring-primary"
+                        type="checkbox"
+                      />
+                      <span className="text-sm font-medium">{h.label}</span>
+                    </div>
+                    {h.active ? (
+                      <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
+                        <input
+                          type="time"
+                          className="px-2 py-1 bg-slate-100 rounded-md border border-slate-200"
+                          value={h.start}
+                          onChange={(e) =>
+                            setOpeningHours((prev) =>
+                              prev.map((x) => (x.dayIndex === h.dayIndex ? { ...x, start: e.target.value } : x))
+                            )
+                          }
+                        />
+                        <span>às</span>
+                        <input
+                          type="time"
+                          className="px-2 py-1 bg-slate-100 rounded-md border border-slate-200"
+                          value={h.end}
+                          onChange={(e) =>
+                            setOpeningHours((prev) =>
+                              prev.map((x) => (x.dayIndex === h.dayIndex ? { ...x, end: e.target.value } : x))
+                            )
+                          }
+                        />
                       </div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-800">{s.name}</p>
-                        <p className="text-[10px] text-slate-500 font-medium">
-                          {s.durationMin} min • R$ {Number(s.price).toFixed(2).replace(".", ",")}
+                    ) : (
+                      <span className="text-xs font-medium text-slate-400 italic">Fechado</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-slate-900 text-sm font-bold uppercase tracking-wider">Datas Exceção (Fechado)</h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!closedDateInput) return;
+                    const id = `${closedDateInput}-${Date.now()}`;
+                    setClosedDates((prev) => [
+                      ...prev,
+                      { id, date: closedDateInput, label: closedLabelInput.trim() },
+                    ]);
+                    setClosedDateInput("");
+                    setClosedLabelInput("");
+                  }}
+                  className="text-primary text-xs font-bold flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-base">add_circle</span>
+                  Adicionar
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="date"
+                  className="h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                  value={closedDateInput}
+                  onChange={(e) => setClosedDateInput(e.target.value)}
+                />
+                <input
+                  type="text"
+                  className="h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                  placeholder="Motivo (ex: Natal)"
+                  value={closedLabelInput}
+                  onChange={(e) => setClosedLabelInput(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                {closedDates.length === 0 ? (
+                  <div className="p-3 bg-white border border-slate-200 rounded-xl text-[11px] text-slate-400 font-semibold">
+                    Nenhuma data de exceção cadastrada.
+                  </div>
+                ) : (
+                  closedDates.map((c) => (
+                    <div key={c.id} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-slate-100 flex flex-col items-center justify-center">
+                          <span className="text-[10px] leading-none text-slate-500 uppercase font-bold">
+                            {c.date ? new Date(c.date + "T00:00:00").toLocaleString("pt-BR", { month: "short" }) : "—"}
+                          </span>
+                          <span className="text-sm font-bold text-primary">
+                            {c.date ? String(new Date(c.date + "T00:00:00").getDate()).padStart(2, "0") : "--"}
+                          </span>
+                        </div>
+                        <span className="text-sm font-medium">{c.label || "Fechado"}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setClosedDates((prev) => prev.filter((x) => x.id !== c.id))}
+                        className="text-slate-300 hover:text-red-500 transition-colors"
+                      >
+                        <span className="material-symbols-outlined">delete</span>
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary">content_cut</span>
+                  <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Funções / Serviços</h4>
+                </div>
+                <button
+                  onClick={openCreateService}
+                  className="text-[11px] font-bold text-primary bg-primary/5 px-3 py-1.5 rounded-full"
+                >
+                  + Novo Serviço
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                {services.map((s) => (
+                  <div key={s.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="size-12 rounded-2xl bg-slate-100 flex items-center justify-center overflow-hidden">
+                          <span className="material-symbols-outlined text-slate-400">{s.icon ?? "content_cut"}</span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-800">{s.name}</p>
+                          <p className="text-[10px] text-slate-500 font-medium">
+                            {s.durationMin} min • R$ {Number(s.price).toFixed(2).replace(".", ",")}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button className="text-slate-300" onClick={() => openEditService(s)}>
+                        <span className="material-symbols-outlined">edit</span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+                      <div className="bg-slate-50 p-2 rounded-xl">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Status</p>
+                        <p className="text-[10px] font-semibold text-slate-700">{s.active ? "Ativo" : "Inativo"}</p>
+                      </div>
+                      <div className="bg-slate-50 p-2 rounded-xl">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Profissionais</p>
+                        <p className="text-[10px] font-semibold text-slate-700">
+                          {String((s.professionalIds || []).length).padStart(2, "0")} vinculados
                         </p>
                       </div>
                     </div>
-
-                    <button className="text-slate-300" onClick={() => openEditService(s)}>
-                      <span className="material-symbols-outlined">edit</span>
-                    </button>
                   </div>
+                ))}
 
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-50">
-                    <div className="bg-slate-50 p-2 rounded-xl">
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Status</p>
-                      <p className="text-[10px] font-semibold text-slate-700">{s.active ? "Ativo" : "Inativo"}</p>
-                    </div>
-                    <div className="bg-slate-50 p-2 rounded-xl">
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Profissionais</p>
-                      <p className="text-[10px] font-semibold text-slate-700">
-                        {String((s.professionalIds || []).length).padStart(2, "0")} vinculados
-                      </p>
-                    </div>
+                {services.length === 0 && (
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+                    <p className="text-[11px] font-semibold text-slate-400">
+                      Nenhum serviço cadastrado ainda. Clique em <span className="text-primary font-bold">+ Novo Serviço</span>.
+                    </p>
                   </div>
-                </div>
-              ))}
-
-              {services.length === 0 && (
-                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
-                  <p className="text-[11px] font-semibold text-slate-400">
-                    Nenhum serviço cadastrado ainda. Clique em <span className="text-primary font-bold">+ Novo Serviço</span>.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Equipe */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">diversity_3</span>
-                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Equipe</h4>
+                )}
               </div>
-              <button
-                onClick={openCreateProfessional}
-                className="text-[11px] font-bold text-primary bg-primary/5 px-3 py-1.5 rounded-full"
-              >
-                + Profissional
-              </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-4">
-              {team.map((m) => (
-                <div key={m.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="size-12 rounded-2xl bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-50">
-                        <span className="material-symbols-outlined text-slate-400">person</span>
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-800">{m.name}</p>
-                        <p className="text-[10px] text-slate-500 font-medium">{m.role}</p>
-                      </div>
-                    </div>
-                    <button className="text-slate-300" onClick={() => openEditProfessional(m)}>
-                      <span className="material-symbols-outlined">edit</span>
-                    </button>
-                  </div>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary">diversity_3</span>
+                  <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Equipe</h4>
+                </div>
+                <button
+                  onClick={openCreateProfessional}
+                  className="text-[11px] font-bold text-primary bg-primary/5 px-3 py-1.5 rounded-full"
+                >
+                  + Profissional
+                </button>
+              </div>
 
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-50">
-                    <div className="bg-slate-50 p-2 rounded-xl">
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Serviços</p>
-                      <p className="text-[10px] font-semibold text-slate-700">
-                        {String(m.servicesActive).padStart(2, "0")} Ativos
-                      </p>
+              <div className="grid grid-cols-1 gap-4">
+                {team.map((m) => (
+                  <div key={m.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="size-12 rounded-2xl bg-slate-100 flex items-center justify-center overflow-hidden">
+                          <span className="material-symbols-outlined text-slate-400">person</span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-800">{m.name}</p>
+                          <p className="text-[10px] text-slate-500 font-medium">{m.role}</p>
+                        </div>
+                      </div>
+                      <button className="text-slate-300" onClick={() => openEditProfessional(m)}>
+                        <span className="material-symbols-outlined">edit</span>
+                      </button>
                     </div>
 
-                    {m.absenceLabel?.kind === "ausencia" ? (
-                      <div className="bg-amber-50 p-2 rounded-xl">
-                        <p className="text-[9px] font-bold text-amber-600 uppercase mb-1">Ausências</p>
-                        <p className="text-[10px] font-semibold text-amber-700">{m.absenceLabel.text}</p>
-                      </div>
-                    ) : m.absenceLabel?.kind === "ferias" ? (
-                      <div className="bg-blue-50 p-2 rounded-xl">
-                        <p className="text-[9px] font-bold text-blue-600 uppercase mb-1">Férias</p>
-                        <p className="text-[10px] font-semibold text-blue-700">{m.absenceLabel.text}</p>
-                      </div>
-                    ) : (
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
                       <div className="bg-slate-50 p-2 rounded-xl">
-                        <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Status</p>
-                        <p className="text-[10px] font-semibold text-slate-700">{m.active ? "Ativo" : "Inativo"}</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Serviços</p>
+                        <p className="text-[10px] font-semibold text-slate-700">
+                          {String(m.servicesActive).padStart(2, "0")} Ativos
+                        </p>
                       </div>
-                    )}
+
+                      {m.absenceLabel?.kind === "ausencia" ? (
+                        <div className="bg-amber-50 p-2 rounded-xl">
+                          <p className="text-[9px] font-bold text-amber-600 uppercase mb-1">Ausências</p>
+                          <p className="text-[10px] font-semibold text-amber-700">{m.absenceLabel.text}</p>
+                        </div>
+                      ) : m.absenceLabel?.kind === "ferias" ? (
+                        <div className="bg-blue-50 p-2 rounded-xl">
+                          <p className="text-[9px] font-bold text-blue-600 uppercase mb-1">Férias</p>
+                          <p className="text-[10px] font-semibold text-blue-700">{m.absenceLabel.text}</p>
+                        </div>
+                      ) : (
+                        <div className="bg-slate-50 p-2 rounded-xl">
+                          <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Status</p>
+                          <p className="text-[10px] font-semibold text-slate-700">{m.active ? "Ativo" : "Inativo"}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {team.length === 0 && (
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+                    <p className="text-[11px] font-semibold text-slate-400">
+                      Nenhum profissional cadastrado ainda. Clique em <span className="text-primary font-bold">+ Profissional</span>.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary">confirmation_number</span>
+                  <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Cupons</h4>
+                </div>
+                <button
+                  onClick={openCreateCoupon}
+                  className="text-[11px] font-bold text-primary bg-primary/5 px-3 py-1.5 rounded-full"
+                >
+                  + Novo Cupom
+                </button>
+              </div>
+
+              {coupons.map((c) => (
+                <div key={c.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <span className="text-xs font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded-lg">{c.code}</span>
+                      <span
+                        className={[
+                          "ml-2 text-[10px] font-bold",
+                          c.status === "Ativo" ? "text-emerald-600" : "text-slate-400",
+                        ].join(" ")}
+                      >
+                        {c.status}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-primary">{c.percentOff}% OFF</span>
+                      <button className="text-slate-300" onClick={() => openEditCoupon(c)}>
+                        <span className="material-symbols-outlined">edit</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="material-symbols-outlined text-xs text-slate-400">person_search</span>
+                    <span className="text-[10px] text-slate-500 font-medium italic">Vinculado a: {c.linkedTo}</span>
+                  </div>
+
+                  <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="bg-primary h-full" style={{ width: `${c.progressPct}%` }} />
+                  </div>
+                  <div className="flex justify-between mt-1.5">
+                    <span className="text-[9px] font-bold text-slate-400">
+                      {c.used}/{c.maxUses} USADOS
+                    </span>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase">Expira: {c.expiresLabel}</span>
                   </div>
                 </div>
               ))}
 
-              {team.length === 0 && (
-                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+              {coupons.length === 0 && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
                   <p className="text-[11px] font-semibold text-slate-400">
-                    Nenhum profissional cadastrado ainda. Clique em <span className="text-primary font-bold">+ Profissional</span>.
+                    Nenhum cupom cadastrado ainda. Clique em <span className="text-primary font-bold">+ Novo Cupom</span>.
                   </p>
                 </div>
               )}
             </div>
-          </div>
 
-          {/* Cupons */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">confirmation_number</span>
-                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Cupons</h4>
-              </div>
+            <div className="pt-4">
               <button
-                onClick={openCreateCoupon}
-                className="text-[11px] font-bold text-primary bg-primary/5 px-3 py-1.5 rounded-full"
+                type="button"
+                onClick={saveTenantData}
+                className="w-full h-14 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20 flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
               >
-                + Novo Cupom
+                Salvar Alterações
               </button>
             </div>
-
-            {coupons.map((c) => (
-              <div key={c.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <span className="text-xs font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded-lg">{c.code}</span>
-                    <span
-                      className={[
-                        "ml-2 text-[10px] font-bold",
-                        c.status === "Ativo" ? "text-emerald-600" : "text-slate-400",
-                      ].join(" ")}
-                    >
-                      {c.status}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-primary">{c.percentOff}% OFF</span>
-                    <button className="text-slate-300" onClick={() => openEditCoupon(c)}>
-                      <span className="material-symbols-outlined">edit</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="material-symbols-outlined text-xs text-slate-400">person_search</span>
-                  <span className="text-[10px] text-slate-500 font-medium italic">Vinculado a: {c.linkedTo}</span>
-                </div>
-
-                <div className="w-full h-1.5 bg-slate-50 rounded-full overflow-hidden">
-                  <div className="bg-primary h-full" style={{ width: `${c.progressPct}%` }} />
-                </div>
-                <div className="flex justify-between mt-1.5">
-                  <span className="text-[9px] font-bold text-slate-400">
-                    {c.used}/{c.maxUses} USADOS
-                  </span>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase">Expira: {c.expiresLabel}</span>
-                </div>
-              </div>
-            ))}
-
-            {coupons.length === 0 && (
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
-                <p className="text-[11px] font-semibold text-slate-400">
-                  Nenhum cupom cadastrado ainda. Clique em <span className="text-primary font-bold">+ Novo Cupom</span>.
-                </p>
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Agenda semanal */}
-        <section className="mt-6 border-t border-slate-100 pt-6">
-          <div className="px-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-extrabold text-slate-800">Agenda Semanal</h3>
-              <div className="flex items-center gap-2">
-                <button
-                  className="size-8 flex items-center justify-center rounded-lg bg-white border border-slate-100 shadow-sm"
-                  onClick={() => {
-                    const d = new Date(weekStart);
-                    d.setDate(d.getDate() - 7);
-                    setWeekStart(startOfWeekMonday(d));
-                    setSelectedDayIndex(1); // mantém terça como padrão (visual)
-                  }}
-                >
-                  <span className="material-symbols-outlined text-sm">chevron_left</span>
-                </button>
-                <span className="text-xs font-bold text-slate-700">{weekLabel}</span>
-                <button
-                  className="size-8 flex items-center justify-center rounded-lg bg-white border border-slate-100 shadow-sm"
-                  onClick={() => {
-                    const d = new Date(weekStart);
-                    d.setDate(d.getDate() + 7);
-                    setWeekStart(startOfWeekMonday(d));
-                    setSelectedDayIndex(1); // mantém terça como padrão (visual)
-                  }}
-                >
-                  <span className="material-symbols-outlined text-sm">chevron_right</span>
-                </button>
-              </div>
+          </section>
+        ) : (
+          <>
+            <div className="h-8 bg-slate-100/50 my-6 border-y border-slate-200 flex items-center justify-center">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">
+                Visualização de Agendamentos
+              </span>
             </div>
 
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
+            {/* Agenda semanal */}
+            <section className="p-4 space-y-6" id="appointments-view">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-slate-900 text-lg font-bold">{monthLabel}</h3>
+                <div className="flex gap-1">
+                  <button
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-200"
+                    onClick={() => {
+                      const d = new Date(weekStart);
+                      d.setDate(d.getDate() - 7);
+                      setWeekStart(startOfWeekMonday(d));
+                      setSelectedDayIndex(1);
+                    }}
+                  >
+                    <span className="material-symbols-outlined text-lg">chevron_left</span>
+                  </button>
+                  <button
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-200"
+                    onClick={() => {
+                      const d = new Date(weekStart);
+                      d.setDate(d.getDate() + 7);
+                      setWeekStart(startOfWeekMonday(d));
+                      setSelectedDayIndex(1);
+                    }}
+                  >
+                    <span className="material-symbols-outlined text-lg">chevron_right</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 mb-4">
                 <button
                   type="button"
                   onClick={() => setViewMode("week")}
@@ -1360,283 +1641,173 @@ function AdminDashboardInner() {
                   Mês
                 </button>
               </div>
-              {viewMode === "month" ? (
-                <div className="flex items-center gap-2">
+
+              <div className="flex overflow-x-auto hide-scrollbar gap-3 pb-2">
+                {weekDays.map((d, idx) => (
                   <button
+                    key={`${d.ymd}-${idx}`}
                     type="button"
-                    onClick={() => {
-                      const day = selectedDate.getDate();
-                      const d = new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1);
-                      const daysInNewMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-                      const safeDay = Math.min(day, daysInNewMonth);
-                      const nextDate = new Date(d.getFullYear(), d.getMonth(), safeDay);
-                      const newWeekStart = startOfWeekMonday(nextDate);
-                      setWeekStart(newWeekStart);
-                      const diff = Math.round((nextDate.getTime() - newWeekStart.getTime()) / (24 * 60 * 60 * 1000));
-                      setSelectedDayIndex(diff);
-                    }}
-                    className="size-7 flex items-center justify-center rounded-lg bg-white border border-slate-100 shadow-sm"
-                    aria-label="Mês anterior"
+                    onClick={() => setSelectedDayIndex(d.index)}
+                    className={[
+                      "flex flex-col items-center justify-center min-w-[56px] h-20 rounded-2xl border shadow-sm transition-all",
+                      d.active ? "bg-primary text-white shadow-lg shadow-primary/30" : "bg-white border-slate-200",
+                    ].join(" ")}
                   >
-                    <span className="material-symbols-outlined text-sm">chevron_left</span>
+                    <span className={["text-[10px] font-medium uppercase", d.active ? "text-white/70" : "text-slate-400"].join(" ")}>
+                      {WEEK_HEADER_LABELS[d.index]}
+                    </span>
+                    <span className="text-lg font-bold">{d.day}</span>
+                    {d.active ? <div className="w-1 h-1 bg-white rounded-full mt-1" /> : null}
                   </button>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{monthLabel}</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const day = selectedDate.getDate();
-                      const d = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 1);
-                      const daysInNewMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-                      const safeDay = Math.min(day, daysInNewMonth);
-                      const nextDate = new Date(d.getFullYear(), d.getMonth(), safeDay);
-                      const newWeekStart = startOfWeekMonday(nextDate);
-                      setWeekStart(newWeekStart);
-                      const diff = Math.round((nextDate.getTime() - newWeekStart.getTime()) / (24 * 60 * 60 * 1000));
-                      setSelectedDayIndex(diff);
-                    }}
-                    className="size-7 flex items-center justify-center rounded-lg bg-white border border-slate-100 shadow-sm"
-                    aria-label="Próximo mês"
-                  >
-                    <span className="material-symbols-outlined text-sm">chevron_right</span>
-                  </button>
+                ))}
+              </div>
+
+              {viewMode === "week" ? (
+                <div className="space-y-4">
+                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest px-1">Próximos Horários</h4>
+                  {filteredWeeklyItems.map((item) => (
+                    <div key={item.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                      {item.status === "busy" ? (
+                        <>
+                          <div className="flex justify-between items-start">
+                            <div className="flex gap-3">
+                              <div className="w-12 h-12 rounded-xl bg-slate-100 overflow-hidden flex items-center justify-center">
+                                <span className="material-symbols-outlined text-2xl text-slate-400">person</span>
+                              </div>
+                              <div>
+                                <h5 className="text-sm font-bold text-slate-900">{item.customer}</h5>
+                                <p className="text-xs text-slate-500">{item.service}</p>
+                                <div className="flex items-center gap-1 mt-1 text-primary">
+                                  <span className="material-symbols-outlined text-sm">schedule</span>
+                                  <span className="text-xs font-bold uppercase tracking-wide">{item.time}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <span className="px-2 py-1 rounded-md bg-green-100 text-green-600 text-[10px] font-bold uppercase tracking-wider">
+                              {bookingStatusLabel(item.bookingStatus)}
+                            </span>
+                          </div>
+                          <div className="flex gap-2 pt-1 border-t border-slate-50">
+                            <button
+                              type="button"
+                              onClick={() => openBookingModal(item.id)}
+                              className="flex-1 h-9 rounded-lg bg-slate-50 text-slate-600 text-xs font-bold flex items-center justify-center gap-1"
+                            >
+                              <span className="material-symbols-outlined text-base">more_horiz</span>
+                              Opções
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openBookingModal(item.id)}
+                              className="flex-1 h-9 rounded-lg bg-primary text-white text-xs font-bold flex items-center justify-center gap-1"
+                            >
+                              <span className="material-symbols-outlined text-base">check</span>
+                              Abrir
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="py-3 text-center text-slate-400 text-[11px] font-semibold">Horário disponível</div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               ) : (
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{weekLabel}</span>
-              )}
-            </div>
-
-            <div className="flex overflow-x-auto no-scrollbar gap-2 pb-4">
-              {filterButtons.map((b) => (
-                <button
-                  key={b.id}
-                  onClick={() => setSelectedFilter(b.id)}
-                  className={[
-                    "shrink-0 h-9 px-4 rounded-full text-[11px] font-bold flex items-center gap-2 transition-all",
-                    selectedFilter === b.id
-                      ? "bg-primary text-white shadow-md shadow-primary/20"
-                      : "bg-white border border-slate-200 text-slate-600",
-                  ].join(" ")}
-                >
-                  {b.id === "all" ? (
-                    "Todos"
-                  ) : (
-                    <>
-                      <div className="size-4 rounded-full bg-slate-200" />
-                      {b.label}
-                    </>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            {viewMode === "week" ? (
-              <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-                <div className="grid grid-cols-7 border-b border-slate-50 text-center">
-                  {WEEK_HEADER_LABELS.map((d) => (
-                    <div key={d} className="p-2 text-[9px] font-bold text-slate-400 uppercase whitespace-nowrap">
-                      {d}
-                    </div>
-                  ))}
-                </div>
-                <div className="grid grid-cols-7 border-b border-slate-50">
-                  {weekDays.map((d) => (
-                    <button
-                      key={d.ymd}
-                      type="button"
-                      onClick={() => setSelectedDayIndex(d.index)}
-                      className={[
-                        "p-3 text-center border-r border-slate-50 transition-all active:scale-[0.99]",
-                      d.active ? "bg-primary/5" : "",
-                      d.index === 6 ? "border-r-0" : "",
-                      ].join(" ")}
-                    >
-                      <p
-                        className={[
-                          "text-xs font-bold",
-                          d.active ? "text-primary" : d.index === 6 ? "text-slate-400" : "text-slate-800",
-                        ].join(" ")}
-                      >
-                        {d.day}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-
-                <div className="p-4 space-y-4">
-                  {/* ✅ (texto discreto) mostra qual dia está selecionado */}
-                  <div className="flex items-center justify-between -mt-1">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                      Dia selecionado
-                    </span>
-                    <span className="text-[10px] font-extrabold text-slate-700">{selectedDateLabel}</span>
+                <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                  <div className="grid grid-cols-7 border-b border-slate-100 text-center">
+                    {WEEK_HEADER_LABELS.map((d) => (
+                      <div key={d} className="p-2 text-[9px] font-bold text-slate-400 uppercase whitespace-nowrap">
+                        {d}
+                      </div>
+                    ))}
                   </div>
-
-                  {filteredWeeklyItems.map((item) => (
-                    <div key={item.id} className="flex gap-4">
-                      <span className="text-[10px] font-bold text-slate-400 w-8 pt-1">{item.time}</span>
-                      <div className="flex-1 space-y-2">
-                        {item.status === "busy" ? (
+                  <div className="grid grid-cols-7 gap-1 p-3">
+                    {(() => {
+                      const firstDow = monthStart.getDay();
+                      const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
+                      const leading = (firstDow + 6) % 7;
+                      const cells = [];
+                      for (let i = 0; i < leading; i++) {
+                        cells.push(<div key={`empty-${i}`} className="h-14 rounded-xl" />);
+                      }
+                      for (let day = 1; day <= daysInMonth; day++) {
+                        const date = new Date(monthStart.getFullYear(), monthStart.getMonth(), day);
+                        const ymd = toYMD(date);
+                        const count = (monthBookings || []).filter((b: any) => {
+                          const startAt: Timestamp | null = b?.startAt ?? null;
+                          if (!startAt) return false;
+                          return toYMD(startAt.toDate()) === ymd;
+                        }).length;
+                        const isSelected = toYMD(selectedDate) === ymd;
+                        cells.push(
                           <button
+                            key={ymd}
                             type="button"
-                            onClick={() => openBookingModal(item.id)}
+                            onClick={() => {
+                              const newWeekStart = startOfWeekMonday(date);
+                              setWeekStart(newWeekStart);
+                              const diff = Math.round((date.getTime() - newWeekStart.getTime()) / (24 * 60 * 60 * 1000));
+                              setSelectedDayIndex(diff);
+                              setViewMode("week");
+                            }}
                             className={[
-                              "p-2.5 rounded-xl border-l-4 text-left w-full transition-all active:scale-[0.99]",
-                              item.color === "blue" ? "bg-blue-50 border-blue-400" : "bg-emerald-50 border-emerald-400",
+                              "h-14 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all active:scale-[0.98]",
+                              isSelected ? "border-primary bg-primary/5" : "border-slate-200 bg-slate-50",
                             ].join(" ")}
-                            aria-label="Abrir opções do agendamento"
                           >
-                            <div className="flex justify-between items-start">
-                              <p
-                                className={[
-                                  "text-[11px] font-bold",
-                                  item.color === "blue" ? "text-blue-900" : "text-emerald-900",
-                                ].join(" ")}
-                              >
-                                {item.service}
-                              </p>
-                              <span
-                                className={[
-                                  "text-[9px] font-bold uppercase",
-                                  item.color === "blue" ? "text-blue-400" : "text-emerald-400",
-                                ].join(" ")}
-                              >
-                                {item.professionalShort}
-                              </span>
-                            </div>
-                            <p
+                            <span className={["text-[11px] font-extrabold", isSelected ? "text-primary" : "text-slate-700"].join(" ")}>
+                              {day}
+                            </span>
+                            <span
                               className={[
-                                "text-[10px] font-medium",
-                                item.color === "blue" ? "text-blue-700/80" : "text-emerald-700/80",
+                                "text-[9px] font-bold px-1.5 py-0.5 rounded-full",
+                                count > 0 ? "bg-primary/10 text-primary" : "bg-slate-100 text-slate-300",
                               ].join(" ")}
                             >
-                              {item.customer}
-                            </p>
-                            <div className="mt-2 flex items-center justify-between">
-                              <span
-                                className={[
-                                  "text-[9px] font-bold uppercase",
-                                  item.color === "blue" ? "text-blue-400/80" : "text-emerald-400/80",
-                                ].join(" ")}
-                              >
-                                {bookingStatusLabel(item.bookingStatus)}
-                              </span>
-                              <span
-                                className={[
-                                  "material-symbols-outlined text-[16px]",
-                                  item.color === "blue" ? "text-blue-400" : "text-emerald-400",
-                                ].join(" ")}
-                              >
-                                more_horiz
-                              </span>
-                            </div>
+                              {count > 0 ? `${count} ag.` : "—"}
+                            </span>
                           </button>
-                        ) : (
-                          <div className="flex-1 border-b border-dashed border-slate-100 h-10 flex items-center">
-                            <span className="text-[10px] text-slate-300 italic">Disponível</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                        );
+                      }
+                      return cells;
+                    })()}
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-                <div className="grid grid-cols-7 border-b border-slate-50 text-center">
-                  {WEEK_HEADER_LABELS.map((d) => (
-                    <div key={d} className="p-2 text-[9px] font-bold text-slate-400 uppercase whitespace-nowrap">
-                      {d}
-                    </div>
-                  ))}
-                </div>
-                <div className="grid grid-cols-7 gap-1 p-3">
-                  {(() => {
-                    const firstDow = monthStart.getDay(); // 0=Dom
-                    const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
-                    const leading = (firstDow + 6) % 7; // ajusta para começar na segunda
-                    const cells = [];
-                    for (let i = 0; i < leading; i++) {
-                      cells.push(<div key={`empty-${i}`} className="h-14 rounded-xl" />);
-                    }
-                    for (let day = 1; day <= daysInMonth; day++) {
-                      const date = new Date(monthStart.getFullYear(), monthStart.getMonth(), day);
-                      const ymd = toYMD(date);
-                      const count = (monthBookings || []).filter((b: any) => {
-                        const startAt: Timestamp | null = b?.startAt ?? null;
-                        if (!startAt) return false;
-                        return toYMD(startAt.toDate()) === ymd;
-                      }).length;
-                      const isSelected = toYMD(selectedDate) === ymd;
-                      cells.push(
-                        <button
-                          key={ymd}
-                          type="button"
-                          onClick={() => {
-                            const newWeekStart = startOfWeekMonday(date);
-                            setWeekStart(newWeekStart);
-                            const diff = Math.round((date.getTime() - newWeekStart.getTime()) / (24 * 60 * 60 * 1000));
-                            setSelectedDayIndex(diff);
-                            setViewMode("week");
-                          }}
-                          className={[
-                            "h-14 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all active:scale-[0.98]",
-                            isSelected ? "border-primary bg-primary/5" : "border-slate-100 bg-slate-50",
-                          ].join(" ")}
-                        >
-                          <span className={["text-[11px] font-extrabold", isSelected ? "text-primary" : "text-slate-700"].join(" ")}>
-                            {day}
-                          </span>
-                          <span
-                            className={[
-                              "text-[9px] font-bold px-1.5 py-0.5 rounded-full",
-                              count > 0 ? "bg-primary/10 text-primary" : "bg-slate-100 text-slate-300",
-                            ].join(" ")}
-                          >
-                            {count > 0 ? `${count} ag.` : "—"}
-                          </span>
-                        </button>
-                      );
-                    }
-                    return cells;
-                  })()}
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
+              )}
+            </section>
 
-        {/* Dashboards */}
-        <section className="mt-8 border-t border-slate-100 pt-6">
-          <div className="px-4 space-y-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-extrabold text-slate-800">Dashboards</h3>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setDashboardRange("week")}
-                  className={[
-                    "h-8 px-3 rounded-full text-[10px] font-extrabold transition-all",
-                    dashboardRange === "week"
-                      ? "bg-primary text-white shadow-md shadow-primary/20"
-                      : "bg-white border border-slate-200 text-slate-600",
-                  ].join(" ")}
-                >
-                  Semanal
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDashboardRange("month")}
-                  className={[
-                    "h-8 px-3 rounded-full text-[10px] font-extrabold transition-all",
-                    dashboardRange === "month"
-                      ? "bg-primary text-white shadow-md shadow-primary/20"
-                      : "bg-white border border-slate-200 text-slate-600",
-                  ].join(" ")}
-                >
-                  Mensal
-                </button>
-              </div>
-            </div>
+            {/* Dashboards */}
+            <section className="mt-8 border-t border-slate-200 pt-6">
+              <div className="px-4 space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-extrabold text-slate-800">Dashboards</h3>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDashboardRange("week")}
+                      className={[
+                        "h-8 px-3 rounded-full text-[10px] font-extrabold transition-all",
+                        dashboardRange === "week"
+                          ? "bg-primary text-white shadow-md shadow-primary/20"
+                          : "bg-white border border-slate-200 text-slate-600",
+                      ].join(" ")}
+                    >
+                      Semanal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDashboardRange("month")}
+                      className={[
+                        "h-8 px-3 rounded-full text-[10px] font-extrabold transition-all",
+                        dashboardRange === "month"
+                          ? "bg-primary text-white shadow-md shadow-primary/20"
+                          : "bg-white border border-slate-200 text-slate-600",
+                      ].join(" ")}
+                    >
+                      Mensal
+                    </button>
+                  </div>
+                </div>
 
             {/* Status por profissional */}
             <div className="space-y-3">
@@ -1723,8 +1894,10 @@ function AdminDashboardInner() {
             </div>
           </div>
         </section>
+          </>
+        )}
 
-        {/* FAB e Bottom nav removidos (tudo já na tela inicial) */}
+      </main>
 
         {/* ========================= MODAIS ========================= */}
 
@@ -2304,7 +2477,6 @@ function AdminDashboardInner() {
             </button>
           </div>
         </ModalShell>
-      </div>
     </div>
   );
 }

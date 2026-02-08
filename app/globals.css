@@ -4,10 +4,174 @@
 
 @layer base {
   body {
-    @apply bg-gradient-to-b from-slate-200 to-slate-300;
+    background: #0f171a;
     -webkit-tap-highlight-color: transparent;
     min-height: max(884px, 100dvh);
   }
+}
+
+body.theme-light {
+  @apply bg-gradient-to-b from-slate-200 to-slate-300 text-slate-900;
+}
+
+/* ===== Tema escuro (todas as telas, exceto landing) ===== */
+body.theme-app {
+  background: #0f171a;
+  color: #e6f5f9;
+}
+
+body.theme-app .glass-header {
+  background: rgba(15, 23, 26, 0.9);
+  border-color: #1b2a30;
+}
+
+body.theme-app .card-shadow {
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+}
+
+body.theme-app .selection-active {
+  border-color: #00b4d8;
+  background-color: rgba(0, 180, 216, 0.12);
+  box-shadow: 0 0 0 1px #00b4d8;
+}
+
+/* Acento */
+body.theme-app .text-client-primary,
+body.theme-app .text-primary {
+  color: #00b4d8;
+}
+body.theme-app .bg-client-primary,
+body.theme-app .bg-primary {
+  background-color: #00b4d8;
+}
+body.theme-app .border-client-primary,
+body.theme-app .border-primary {
+  border-color: #00b4d8;
+}
+
+/* Fundos e superfícies */
+body.theme-app .bg-background-offwhite,
+body.theme-app .bg-background-admin,
+body.theme-app .bg-background-admin-2 {
+  background-color: #0f171a;
+}
+body.theme-app .bg-white {
+  background-color: #111c21;
+}
+body.theme-app .bg-slate-50 {
+  background-color: #131d22;
+}
+body.theme-app .bg-slate-100 {
+  background-color: #162026;
+}
+body.theme-app .bg-slate-200 {
+  background-color: #1b2a30;
+}
+body.theme-app .bg-slate-300 {
+  background-color: #22343b;
+}
+body.theme-app .bg-slate-700 {
+  background-color: #0f171a;
+}
+body.theme-app .bg-slate-800 {
+  background-color: #0f171a;
+}
+body.theme-app .bg-slate-900 {
+  background-color: #00b4d8;
+}
+body.theme-app .bg-slate-900\/40 {
+  background-color: rgba(0, 180, 216, 0.4);
+}
+body.theme-app .bg-slate-900\/20 {
+  background-color: rgba(0, 180, 216, 0.2);
+}
+body.theme-app .bg-black {
+  background-color: #0b1215;
+}
+body.theme-app .bg-amber-50,
+body.theme-app .bg-emerald-50 {
+  background-color: rgba(0, 180, 216, 0.12);
+}
+body.theme-app .bg-red-50 {
+  background-color: rgba(239, 68, 68, 0.12);
+}
+
+/* Texto */
+body.theme-app .text-white {
+  color: #e6f5f9;
+}
+body.theme-app .text-black {
+  color: #0b1215;
+}
+body.theme-app .text-amber-700,
+body.theme-app .text-emerald-600 {
+  color: #00b4d8;
+}
+body.theme-app .text-red-600 {
+  color: #ff7a7a;
+}
+body.theme-app .text-slate-200 {
+  color: #bcd7e0;
+}
+body.theme-app .text-slate-900 {
+  color: #e6f5f9;
+}
+body.theme-app .text-slate-800 {
+  color: #d9eef5;
+}
+body.theme-app .text-slate-700 {
+  color: #c7e2ea;
+}
+body.theme-app .text-slate-600 {
+  color: #9fbcc6;
+}
+body.theme-app .text-slate-500 {
+  color: #86a5b0;
+}
+body.theme-app .text-slate-400 {
+  color: #6f8c96;
+}
+body.theme-app .text-slate-300 {
+  color: #58727c;
+}
+
+/* Bordas */
+body.theme-app .border-white {
+  border-color: #22343b;
+}
+body.theme-app .border-slate-100 {
+  border-color: #1b2a30;
+}
+body.theme-app .border-slate-200 {
+  border-color: #22343b;
+}
+body.theme-app .border-slate-300 {
+  border-color: #2a3e46;
+}
+body.theme-app .border-amber-200,
+body.theme-app .border-emerald-200 {
+  border-color: rgba(0, 180, 216, 0.35);
+}
+body.theme-app .border-red-200 {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+/* Inputs */
+body.theme-app input,
+body.theme-app textarea,
+body.theme-app select {
+  color: #e6f5f9;
+  background-color: #111c21;
+}
+body.theme-app input::placeholder,
+body.theme-app textarea::placeholder {
+  color: #6f8c96;
+}
+body.theme-app input:disabled,
+body.theme-app textarea:disabled,
+body.theme-app select:disabled {
+  color: #58727c;
+  background-color: #131d22;
 }
 
 /* ✅ Material Symbols: garante que os textos (ex: content_cut) virem ícones */
