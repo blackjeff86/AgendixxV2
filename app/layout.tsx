@@ -22,14 +22,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined"
           rel="stylesheet"
         />
+      </head>
+      <body className="font-sans">
         <script
           dangerouslySetInnerHTML={{
             __html:
               "(() => { try { const p = location.pathname || '/'; const useApp = !(p === '/' || p.startsWith('/admin')); const b = document.body; if (useApp) { b?.classList.add('theme-app'); b?.classList.remove('theme-light'); } else { b?.classList.add('theme-light'); b?.classList.remove('theme-app'); } } catch (e) {} })();",
           }}
         />
-      </head>
-      <body className="font-sans">
         <ThemeBodyClass />
         {children}
       </body>

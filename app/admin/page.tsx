@@ -25,7 +25,6 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 type TeamMember = {
   id: string;
   name: string;
-  role: string;
   servicesActive: number;
   absenceLabel?: { kind: "ausencia" | "ferias"; text: string };
   avatarUrl?: string;
@@ -167,6 +166,13 @@ function firstName(full: string) {
   return (full || "").trim().split(/\s+/)[0] || full;
 }
 
+function initialsFromName(full: string) {
+  const parts = (full || "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "";
+  if (parts.length === 1) return parts[0][0]?.toUpperCase() ?? "";
+  return `${parts[0][0] ?? ""}${parts[parts.length - 1][0] ?? ""}`.toUpperCase();
+}
+
 function formatAbsenceLabel(kind: "ausencia" | "ferias", startAt: Timestamp | null, endAt: Timestamp | null) {
   const start = startAt ? toExpiresLabel(startAt) : "—";
   const end = endAt ? toExpiresLabel(endAt) : "—";
@@ -236,7 +242,7 @@ function ModalShell({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center">
       {/* overlay */}
       <button
         type="button"
@@ -245,7 +251,7 @@ function ModalShell({
         aria-label="Fechar modal"
       />
       {/* panel */}
-      <div className="relative w-full sm:max-w-[520px] bg-white rounded-t-3xl sm:rounded-3xl border border-slate-100 shadow-2xl p-5 sm:p-6 m-0 sm:m-4">
+      <div className="relative w-full sm:max-w-[520px] bg-white rounded-3xl border border-slate-100 shadow-2xl p-5 sm:p-6 m-4 max-h-[85vh] overflow-visible">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h3 className="text-base font-extrabold text-slate-900 tracking-tight">{title}</h3>
@@ -260,7 +266,7 @@ function ModalShell({
           </button>
         </div>
 
-        <div className="mt-5">{children}</div>
+        <div className="mt-5 overflow-visible">{children}</div>
       </div>
     </div>
   );
@@ -337,6 +343,7 @@ function AdminDashboardInner() {
   const [salonName, setSalonName] = useState<string>("Carregando...");
   const [tenantSlug, setTenantSlug] = useState<string>(tenantId);
   const [tenantForm, setTenantForm] = useState({ name: "", phone: "", email: "", address: "" });
+  const [tenantDetailsOpen, setTenantDetailsOpen] = useState<boolean>(false);
   const [openingHours, setOpeningHours] = useState<OpeningHour[]>(() => buildDefaultOpeningHours());
   const [closedDates, setClosedDates] = useState<ClosedDate[]>([]);
   const [closedDateInput, setClosedDateInput] = useState<string>("");
@@ -351,7 +358,7 @@ function AdminDashboardInner() {
   const [weeklyItems, setWeeklyItems] = useState<WeeklyItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [viewMode, setViewMode] = useState<"week" | "month">("week");
-  const [dashboardRange, setDashboardRange] = useState<"week" | "month">("week");
+  const [dashboardRange] = useState<"week" | "month">("month");
   const [activeView, setActiveView] = useState<"settings" | "appointments">("settings");
 
   // ===== UI state (mantém funcionalidades) =====
@@ -476,12 +483,11 @@ function AdminDashboardInner() {
   const [proEditingId, setProEditingId] = useState<string | null>(null);
   const [proForm, setProForm] = useState({
     name: "",
-    role: "",
-    avatarUrl: "",
     active: true,
 
     // escala (dias da semana)
     workingDays: [1, 2, 3, 4, 5] as number[], // default Seg-Sex (0=Dom ... 6=Sáb)
+    shift: "morning" as "morning" | "afternoon" | "evening",
 
     // ausência/férias (calendário)
     absenceKind: "" as "" | "ausencia" | "ferias",
@@ -508,6 +514,7 @@ function AdminDashboardInner() {
 
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const [bookingSelectedId, setBookingSelectedId] = useState<string | null>(null);
+  const [adminBookingOpen, setAdminBookingOpen] = useState(false);
 
   // ===== Firestore: subscriptions =====
   useEffect(() => {
@@ -587,10 +594,8 @@ function AdminDashboardInner() {
         return {
           id: d.id,
           name: String(data?.name ?? ""),
-          role: String(data?.role ?? ""),
           servicesActive: 0, // calculamos com services
           absenceLabel,
-          avatarUrl: String(data?.avatarUrl ?? ""),
           active: Boolean(data?.active ?? true),
 
           workingDays: normalizeWorkingDays(data?.workingDays),
@@ -863,11 +868,10 @@ function AdminDashboardInner() {
     setProEditingId(null);
     setProForm({
       name: "",
-      role: "",
-      avatarUrl: "",
       active: true,
 
       workingDays: [1, 2, 3, 4, 5],
+      shift: "morning",
 
       absenceKind: "",
       absenceDate: "",
@@ -895,11 +899,10 @@ function AdminDashboardInner() {
     setProEditingId(p.id);
     setProForm({
       name: p.name,
-      role: p.role,
-      avatarUrl: p.avatarUrl ?? "",
       active: Boolean(p.active),
 
       workingDays: normalizeWorkingDays(p.workingDays),
+      shift: (p as any)?.shift ?? "morning",
 
       absenceKind: kind,
       absenceDate: kind === "ausencia" ? startVal : "",
@@ -939,8 +942,6 @@ function AdminDashboardInner() {
     const name = proForm.name.trim();
     if (!name) return alert("Informe o nome do profissional.");
 
-    const role = proForm.role.trim();
-    const avatarUrl = proForm.avatarUrl.trim();
 
     // working days
     const workingDays = normalizeWorkingDays(proForm.workingDays);
@@ -973,12 +974,11 @@ function AdminDashboardInner() {
 
     const basePayload: any = {
       name,
-      role,
-      avatarUrl,
       active: Boolean(proForm.active),
 
       // NOVO: agenda (dias da semana)
       workingDays,
+      shift: proForm.shift,
 
       // NOVO: bloqueio por período (para não permitir seleção/reserva)
       absenceKind,
@@ -1105,6 +1105,11 @@ function AdminDashboardInner() {
     }
   }
 
+  function openAdminBooking() {
+    if (!bookingLink) return;
+    setAdminBookingOpen(true);
+  }
+
   // default do filtro quando team muda
   useEffect(() => {
     if (selectedFilter === "all") return;
@@ -1117,6 +1122,14 @@ function AdminDashboardInner() {
       setWeekStart(normalized);
     }
   }, [weekStart]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.body.style.overflow = adminBookingOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [adminBookingOpen]);
 
   // ===== UI helpers (modal) =====
   const activeServicesList = useMemo(() => services.filter((s) => s.active), [services]);
@@ -1141,12 +1154,18 @@ function AdminDashboardInner() {
   return (
     <div className="bg-background-light text-slate-900 min-h-screen">
       <header className="sticky top-0 z-50 bg-background-light/80 backdrop-blur-md border-b border-slate-200">
-        <div className="flex flex-col items-center p-4 gap-2">
-          <img src="/logo-axk.png" alt="Agendixx" className="h-8 w-auto object-contain" />
-          <div className="flex flex-col items-center">
+        <div className="relative flex items-center justify-between p-4">
+          <div className="flex flex-col">
             <h2 className="text-[#0d141b] text-lg font-bold leading-tight tracking-tight">{salonName}</h2>
             <p className="text-xs text-slate-500">{tenantForm.email || "admin@agendixx.com"}</p>
           </div>
+
+          <img
+            src="/logo-axk.png"
+            alt="Agendixx"
+            className="absolute left-1/2 -translate-x-1/2 h-8 w-auto object-contain"
+          />
+
           <button
             type="button"
             onClick={handleSignOut}
@@ -1191,45 +1210,62 @@ function AdminDashboardInner() {
         {activeView === "settings" ? (
           <section className="p-4 space-y-6" id="settings-view">
             <div className="space-y-4">
-              <h3 className="text-slate-900 text-sm font-bold uppercase tracking-wider">Dados do Salão</h3>
-              <div className="space-y-3">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-slate-700 ml-1">Nome do Salão</label>
-                  <input
-                    className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                    type="text"
-                    value={tenantForm.name}
-                    onChange={(e) => setTenantForm((p) => ({ ...p, name: e.target.value }))}
-                  />
+              <button
+                type="button"
+                onClick={() => setTenantDetailsOpen((v) => !v)}
+                className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-2xl p-4 text-left"
+              >
+                <div className="flex flex-col">
+                  <h3 className="text-slate-900 text-sm font-bold uppercase tracking-wider">Dados do Salão</h3>
+                  <span className="text-[11px] text-slate-500">
+                    {tenantDetailsOpen ? "Toque para ocultar" : "Toque para expandir"}
+                  </span>
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-slate-700 ml-1">Endereço do Salão</label>
-                  <input
-                    className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                    type="text"
-                    value={tenantForm.address}
-                    onChange={(e) => setTenantForm((p) => ({ ...p, address: e.target.value }))}
-                  />
+                <span className="material-symbols-outlined text-slate-400">
+                  {tenantDetailsOpen ? "expand_less" : "expand_more"}
+                </span>
+              </button>
+
+              {tenantDetailsOpen ? (
+                <div className="space-y-3">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-slate-700 ml-1">Nome do Salão</label>
+                    <input
+                      className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                      type="text"
+                      value={tenantForm.name}
+                      onChange={(e) => setTenantForm((p) => ({ ...p, name: e.target.value }))}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-slate-700 ml-1">Endereço do Salão</label>
+                    <input
+                      className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                      type="text"
+                      value={tenantForm.address}
+                      onChange={(e) => setTenantForm((p) => ({ ...p, address: e.target.value }))}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-slate-700 ml-1">WhatsApp de Contato</label>
+                    <input
+                      className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                      type="tel"
+                      value={tenantForm.phone}
+                      onChange={(e) => setTenantForm((p) => ({ ...p, phone: formatPhoneBR(e.target.value) }))}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-slate-700 ml-1">Email do Admin</label>
+                    <input
+                      className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                      type="email"
+                      value={tenantForm.email}
+                      onChange={(e) => setTenantForm((p) => ({ ...p, email: e.target.value }))}
+                    />
+                  </div>
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-slate-700 ml-1">WhatsApp de Contato</label>
-                  <input
-                    className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                    type="tel"
-                    value={tenantForm.phone}
-                    onChange={(e) => setTenantForm((p) => ({ ...p, phone: formatPhoneBR(e.target.value) }))}
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-slate-700 ml-1">Email do Admin</label>
-                  <input
-                    className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                    type="email"
-                    value={tenantForm.email}
-                    onChange={(e) => setTenantForm((p) => ({ ...p, email: e.target.value }))}
-                  />
-                </div>
-              </div>
+              ) : null}
             </div>
 
             <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 space-y-3">
@@ -1454,11 +1490,10 @@ function AdminDashboardInner() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="size-12 rounded-2xl bg-slate-100 flex items-center justify-center overflow-hidden">
-                          <span className="material-symbols-outlined text-slate-400">person</span>
+                          <span className="text-sm font-black text-slate-600">{initialsFromName(m.name)}</span>
                         </div>
                         <div>
                           <p className="text-sm font-bold text-slate-800">{m.name}</p>
-                          <p className="text-[10px] text-slate-500 font-medium">{m.role}</p>
                         </div>
                       </div>
                       <button className="text-slate-300" onClick={() => openEditProfessional(m)}>
@@ -1593,10 +1628,22 @@ function AdminDashboardInner() {
                   <button
                     className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-200"
                     onClick={() => {
-                      const d = new Date(weekStart);
-                      d.setDate(d.getDate() - 7);
-                      setWeekStart(startOfWeekMonday(d));
-                      setSelectedDayIndex(1);
+                      if (viewMode === "week") {
+                        const d = new Date(weekStart);
+                        d.setDate(d.getDate() - 7);
+                        setWeekStart(startOfWeekMonday(d));
+                        setSelectedDayIndex(1);
+                      } else {
+                        const day = selectedDate.getDate();
+                        const d = new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1);
+                        const daysInNewMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+                        const safeDay = Math.min(day, daysInNewMonth);
+                        const nextDate = new Date(d.getFullYear(), d.getMonth(), safeDay);
+                        const newWeekStart = startOfWeekMonday(nextDate);
+                        setWeekStart(newWeekStart);
+                        const diff = Math.round((nextDate.getTime() - newWeekStart.getTime()) / (24 * 60 * 60 * 1000));
+                        setSelectedDayIndex(diff);
+                      }
                     }}
                   >
                     <span className="material-symbols-outlined text-lg">chevron_left</span>
@@ -1604,10 +1651,22 @@ function AdminDashboardInner() {
                   <button
                     className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-200"
                     onClick={() => {
-                      const d = new Date(weekStart);
-                      d.setDate(d.getDate() + 7);
-                      setWeekStart(startOfWeekMonday(d));
-                      setSelectedDayIndex(1);
+                      if (viewMode === "week") {
+                        const d = new Date(weekStart);
+                        d.setDate(d.getDate() + 7);
+                        setWeekStart(startOfWeekMonday(d));
+                        setSelectedDayIndex(1);
+                      } else {
+                        const day = selectedDate.getDate();
+                        const d = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 1);
+                        const daysInNewMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+                        const safeDay = Math.min(day, daysInNewMonth);
+                        const nextDate = new Date(d.getFullYear(), d.getMonth(), safeDay);
+                        const newWeekStart = startOfWeekMonday(nextDate);
+                        setWeekStart(newWeekStart);
+                        const diff = Math.round((nextDate.getTime() - newWeekStart.getTime()) / (24 * 60 * 60 * 1000));
+                        setSelectedDayIndex(diff);
+                      }
                     }}
                   >
                     <span className="material-symbols-outlined text-lg">chevron_right</span>
@@ -1643,7 +1702,13 @@ function AdminDashboardInner() {
               </div>
 
               <div className="flex overflow-x-auto hide-scrollbar gap-3 pb-2">
-                {weekDays.map((d, idx) => (
+                {weekDays.map((d, idx) => {
+                  const hasBookings = (weekBookings || []).some((b: any) => {
+                    const startAt: Timestamp | null = b?.startAt ?? null;
+                    if (!startAt) return false;
+                    return toYMD(startAt.toDate()) === d.ymd;
+                  });
+                  return (
                   <button
                     key={`${d.ymd}-${idx}`}
                     type="button"
@@ -1658,8 +1723,10 @@ function AdminDashboardInner() {
                     </span>
                     <span className="text-lg font-bold">{d.day}</span>
                     {d.active ? <div className="w-1 h-1 bg-white rounded-full mt-1" /> : null}
+                    {hasBookings ? <span className="text-[10px] text-amber-400 mt-0.5">★</span> : null}
                   </button>
-                ))}
+                );
+              })}
               </div>
 
               {viewMode === "week" ? (
@@ -1781,32 +1848,7 @@ function AdminDashboardInner() {
               <div className="px-4 space-y-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-extrabold text-slate-800">Dashboards</h3>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setDashboardRange("week")}
-                      className={[
-                        "h-8 px-3 rounded-full text-[10px] font-extrabold transition-all",
-                        dashboardRange === "week"
-                          ? "bg-primary text-white shadow-md shadow-primary/20"
-                          : "bg-white border border-slate-200 text-slate-600",
-                      ].join(" ")}
-                    >
-                      Semanal
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDashboardRange("month")}
-                      className={[
-                        "h-8 px-3 rounded-full text-[10px] font-extrabold transition-all",
-                        dashboardRange === "month"
-                          ? "bg-primary text-white shadow-md shadow-primary/20"
-                          : "bg-white border border-slate-200 text-slate-600",
-                      ].join(" ")}
-                    >
-                      Mensal
-                    </button>
-                  </div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mensal</span>
                 </div>
 
             {/* Status por profissional */}
@@ -1818,9 +1860,7 @@ function AdminDashboardInner() {
                     Status de Reservas por Profissional
                   </h4>
                 </div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  {dashboardRange === "week" ? "Semana" : "Mês"}
-                </span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mês</span>
               </div>
 
               <div className="grid grid-cols-1 gap-3">
@@ -1872,9 +1912,7 @@ function AdminDashboardInner() {
                     Novos x Recorrentes
                   </h4>
                 </div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  {dashboardRange === "week" ? "Semana" : "Mês"}
-                </span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mês</span>
               </div>
 
               <div className="grid grid-cols-3 gap-3">
@@ -1899,7 +1937,40 @@ function AdminDashboardInner() {
 
       </main>
 
+        {/* FAB - Novo agendamento */}
+        <button
+          type="button"
+          onClick={openAdminBooking}
+          className="fixed right-5 bottom-6 z-[150] h-12 px-4 rounded-full bg-primary text-white font-bold shadow-lg shadow-primary/30 flex items-center gap-2 active:scale-[0.98]"
+        >
+          <span className="material-symbols-outlined text-[20px]">add</span>
+          Novo agendamento
+        </button>
+
         {/* ========================= MODAIS ========================= */}
+        {adminBookingOpen ? (
+          <div className="fixed inset-0 z-[220] flex items-center justify-center p-4">
+            <button
+              type="button"
+              onClick={() => setAdminBookingOpen(false)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]"
+              aria-label="Fechar modal"
+            />
+            <div className="relative w-full max-w-[980px] h-[85vh] bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden">
+              <div className="h-12 px-4 border-b border-slate-100 flex items-center justify-between">
+                <span className="text-sm font-bold text-slate-700">Novo agendamento</span>
+                <button
+                  type="button"
+                  onClick={() => setAdminBookingOpen(false)}
+                  className="h-8 w-8 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition-all"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+              <iframe title="Agendamento" src={bookingLink} className="w-full h-[calc(85vh-3rem)] border-0" />
+            </div>
+          </div>
+        ) : null}
 
         {/* Modal Serviço */}
         <ModalShell
@@ -1963,7 +2034,7 @@ function AdminDashboardInner() {
                   </button>
 
                   {serviceIconPickerOpen ? (
-                    <div className="absolute z-20 mt-2 w-full rounded-2xl border border-slate-100 bg-white shadow-xl p-3">
+                    <div className="absolute z-[250] mt-2 w-full rounded-2xl border border-slate-100 bg-white shadow-xl p-3">
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">
                         Escolha um ícone
                       </p>
@@ -2080,26 +2151,6 @@ function AdminDashboardInner() {
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Função / Especialidade</label>
-              <input
-                className="w-full h-12 px-4 rounded-2xl border border-slate-200 bg-white text-sm font-semibold focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all"
-                value={proForm.role}
-                onChange={(e) => setProForm((p) => ({ ...p, role: e.target.value }))}
-                placeholder="Ex: Corte & Barba"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Avatar URL (opcional)</label>
-              <input
-                className="w-full h-12 px-4 rounded-2xl border border-slate-200 bg-white text-sm font-semibold focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all"
-                value={proForm.avatarUrl}
-                onChange={(e) => setProForm((p) => ({ ...p, avatarUrl: e.target.value }))}
-                placeholder="https://..."
-              />
-            </div>
-
             {/* NOVO: calendário do profissional (dias da semana) */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -2135,6 +2186,33 @@ function AdminDashboardInner() {
                 <p className="mt-2 text-[10px] font-semibold text-slate-400">
                   Esses dias serão usados para permitir/impedir seleção do profissional no agendamento.
                 </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Turno</label>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: "morning", label: "Manhã" },
+                  { id: "afternoon", label: "Tarde" },
+                  { id: "evening", label: "Noite" },
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setProForm((p) => ({ ...p, shift: opt.id as any }))}
+                    className={[
+                      "h-10 px-4 rounded-full border text-[11px] font-extrabold transition-all active:scale-[0.99]",
+                      proForm.shift === opt.id
+                        ? "bg-primary text-white border-primary shadow-md shadow-primary/20"
+                        : "bg-white border-slate-200 text-slate-600",
+                    ].join(" ")}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
               </div>
             </div>
 

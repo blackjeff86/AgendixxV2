@@ -978,7 +978,7 @@ export default function BookingClientPage({ slug }: { slug?: string }) {
           return {
             id: d.id,
             name: String(data?.name ?? ""),
-            avatarUrl: String(data?.avatarUrl ?? ""),
+            avatarUrl: "",
           };
         });
 
@@ -2292,7 +2292,7 @@ export default function BookingClientPage({ slug }: { slug?: string }) {
                       ) : null}
                       {pros.map((p) => {
                         const active = scheduleByService[svc.id]?.professionalId === p.id;
-                        const avatar = (p.avatarUrl || "").trim();
+                        const avatar = "";
                         return (
                           <button
                             key={p.id}
