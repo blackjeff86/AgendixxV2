@@ -9,7 +9,7 @@ module.exports = {
     extend: {
       colors: {
         // Tema Admin (templates 2 e 3)
-        primary: "#13b6ec",
+        primary: "#2ba4d8",
         "background-light": "#f8fafb",
         "surface-light": "#ffffff",
         "text-main": "#1e293b",

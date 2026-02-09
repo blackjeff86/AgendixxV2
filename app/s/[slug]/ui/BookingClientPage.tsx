@@ -43,6 +43,15 @@ type TenantOpeningHour = {
   end: string;
 };
 
+type TenantClosedRange = {
+  id: string;
+  date: string; // YYYY-MM-DD
+  start?: string;
+  end?: string;
+  label?: string;
+  allDay?: boolean;
+};
+
 type TimeSlot = {
   time: string;
   available: boolean;
@@ -55,6 +64,8 @@ type ProCalendar = {
   offDates: string[];
   // períodos de férias (YYYY-MM-DD)
   vacations: { start: string; end: string }[];
+  // fechamentos pontuais (YYYY-MM-DD) com intervalo ou dia inteiro
+  closedRanges?: { date: string; start?: string; end?: string; allDay?: boolean; label?: string }[];
   // (opcional) horário/slot
   dayStart: string; // "09:00"
   dayEnd: string; // "18:00"
@@ -154,6 +165,11 @@ function isDayWithinAbsences(cal: ProCalendar | null, ymd: string) {
   return cal.absences.some((a) => overlaps(dayStart, dayEnd, a.startAt, a.endAt));
 }
 
+function hasAllDayClosedRange(cal: ProCalendar | null, ymd: string) {
+  if (!cal || !Array.isArray(cal.closedRanges) || cal.closedRanges.length === 0) return false;
+  return cal.closedRanges.some((r) => r?.date === ymd && Boolean(r?.allDay));
+}
+
 function isDayAllowedGivenCal(cal: ProCalendar | null, ymd: string) {
   if (!cal) return false; // enquanto não carrega, bloqueia seleção
   const dt = dateValueAtStartOfDay(ymd);
@@ -170,6 +186,8 @@ function isDayAllowedGivenCal(cal: ProCalendar | null, ymd: string) {
       if (v?.start && v?.end && inRangeInclusive(ymd, v.start, v.end)) return false;
     }
   }
+
+  if (hasAllDayClosedRange(cal, ymd)) return false;
 
   // ✅ ausências por intervalo (absenceStartAt/absenceEndAt)
   if (isDayWithinAbsences(cal, ymd)) return false;
@@ -242,6 +260,7 @@ export default function BookingClientPage({ slug }: { slug?: string }) {
   const publicLink = `agendix.me/${safeSlug}`;
   const [tenantOpeningHours, setTenantOpeningHours] = useState<TenantOpeningHour[]>([]);
   const [tenantClosedDates, setTenantClosedDates] = useState<string[]>([]);
+  const [tenantClosedRanges, setTenantClosedRanges] = useState<TenantClosedRange[]>([]);
 
   const [services, setServices] = useState<Service[]>([]);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
@@ -419,8 +438,44 @@ export default function BookingClientPage({ slug }: { slug?: string }) {
     return list.find((h) => h.dayIndex === dayIndex) ?? null;
   }
 
+  function getClosedRangesForDay(ymd: string) {
+    return tenantClosedRanges
+      .filter((r) => r.date === ymd)
+      .map((r) => {
+        if (r.allDay) {
+          return { allDay: true, startMin: 0, endMin: 24 * 60 };
+        }
+        if (!r.start || !r.end) return null;
+        const startMin = parseTimeToMinutes(r.start);
+        const endMin = parseTimeToMinutes(r.end);
+        if (endMin <= startMin) return null;
+        return { allDay: false, startMin, endMin };
+      })
+      .filter(Boolean) as { allDay: boolean; startMin: number; endMin: number }[];
+  }
+
+  function getClosedRangesForDayFromCal(cal: ProCalendar | null, ymd: string) {
+    if (!cal || !Array.isArray(cal.closedRanges)) return [];
+    return cal.closedRanges
+      .filter((r) => r?.date === ymd)
+      .map((r) => {
+        if (r?.allDay) return { allDay: true, startMin: 0, endMin: 24 * 60 };
+        if (!r?.start || !r?.end) return null;
+        const startMin = parseTimeToMinutes(r.start);
+        const endMin = parseTimeToMinutes(r.end);
+        if (endMin <= startMin) return null;
+        return { allDay: false, startMin, endMin };
+      })
+      .filter(Boolean) as { allDay: boolean; startMin: number; endMin: number }[];
+  }
+
+  function isSlotBlockedByClosedRange(startMin: number, endMin: number, ranges: { allDay: boolean; startMin: number; endMin: number }[]) {
+    return ranges.some((r) => r.allDay || (startMin < r.endMin && endMin > r.startMin));
+  }
+
   function isTenantOpenDay(ymd: string) {
     if (tenantClosedDates.includes(ymd)) return false;
+    if (getClosedRangesForDay(ymd).some((r) => r.allDay)) return false;
     const h = getTenantHoursForDate(ymd);
     if (!h) return true;
     return Boolean(h.active);
@@ -756,7 +811,10 @@ export default function BookingClientPage({ slug }: { slug?: string }) {
   const currentSchedule = currentService ? scheduleByService[currentService.id] : null;
   const currentProfessionalId = currentSchedule?.professionalId ?? "";
   const currentHoldId = currentSchedule?.holdId ?? null;
-  const isSalonOpenSelectedDay = useMemo(() => isTenantOpenDay(selectedDay), [selectedDay, tenantClosedDates, tenantOpeningHours]);
+  const isSalonOpenSelectedDay = useMemo(
+    () => isTenantOpenDay(selectedDay),
+    [selectedDay, tenantClosedDates, tenantOpeningHours, tenantClosedRanges]
+  );
   const currentHoldExpiresAt = useMemo(() => {
     if (!currentHoldId || !currentProfessionalId) return null;
     const list = proBookingsMap[currentProfessionalId] ?? [];
@@ -781,7 +839,7 @@ export default function BookingClientPage({ slug }: { slug?: string }) {
       if (!isTenantOpenDay(ymd)) return false;
       return isDayAllowedGivenCal(cal, ymd);
     };
-  }, [currentProfessionalId, proCalendars, tenantOpeningHours, tenantClosedDates]);
+  }, [currentProfessionalId, proCalendars, tenantOpeningHours, tenantClosedDates, tenantClosedRanges]);
 
   // ===== Slots reais do dia selecionado (lidos do banco via regras: calendário + bookings) =====
   const slotsByDay: Record<string, TimeSlot[]> = useMemo(() => {
@@ -795,6 +853,10 @@ export default function BookingClientPage({ slug }: { slug?: string }) {
     const durationMin = Number(currentService.durationMin ?? 0) || 30;
     const currentClientId = normalizePhoneId(customerPhone);
     const tenantHours = getTenantHoursForDate(ymd);
+    const closedRangesForDay = [
+      ...getClosedRangesForDay(ymd),
+      ...getClosedRangesForDayFromCal(cal, ymd),
+    ];
 
     const bookingsForDay = (proBookingsMap[currentProfessionalId] || [])
       .map((b) => {
@@ -849,6 +911,12 @@ export default function BookingClientPage({ slug }: { slug?: string }) {
             continue;
           }
         }
+        const slotStartMin = parseTimeToMinutes(t);
+        const slotEndMin = slotStartMin + durationMin;
+        if (isSlotBlockedByClosedRange(slotStartMin, slotEndMin, closedRangesForDay)) {
+          slots.push({ time: t, available: false });
+          continue;
+        }
         const conflict = bookingsForDay.some((b) => {
           if (String(b.status) === "cancelled") return false;
           if (String(b.status) === "hold") {
@@ -888,6 +956,12 @@ export default function BookingClientPage({ slug }: { slug?: string }) {
       const slotStart = combineYMDTimeToDate(ymd, t);
       const slotEnd = new Date(slotStart);
       slotEnd.setMinutes(slotEnd.getMinutes() + durationMin);
+      const slotStartMin = parseTimeToMinutes(t);
+      const slotEndMin = slotStartMin + durationMin;
+      if (isSlotBlockedByClosedRange(slotStartMin, slotEndMin, closedRangesForDay)) {
+        slots.push({ time: t, available: false });
+        continue;
+      }
       const conflict = bookingsForDay.some((b) => {
         if (String(b.status) === "cancelled") return false;
         if (String(b.status) === "hold") {
@@ -950,6 +1024,7 @@ export default function BookingClientPage({ slug }: { slug?: string }) {
         const tenantAddress = String(tenantData?.address ?? "");
         const openingHoursRaw = Array.isArray(tenantData?.openingHours) ? (tenantData.openingHours as any[]) : null;
         const closedDatesRaw = Array.isArray(tenantData?.closedDates) ? (tenantData.closedDates as any[]) : [];
+        const closedRangesRaw = Array.isArray(tenantData?.closedRanges) ? (tenantData.closedRanges as any[]) : [];
 
         // 2) Services (subcoleção)
         const servicesRef = collection(db, "tenants", safeSlug, "services");
@@ -1002,6 +1077,18 @@ export default function BookingClientPage({ slug }: { slug?: string }) {
           closedDatesRaw
             .map((c: any) => String(c?.date ?? ""))
             .filter(Boolean)
+        );
+        setTenantClosedRanges(
+          closedRangesRaw
+            .map((r: any, idx: number) => ({
+              id: String(r?.id ?? `${r?.date ?? idx}-${idx}`),
+              date: String(r?.date ?? ""),
+              start: r?.start ? String(r.start) : "",
+              end: r?.end ? String(r.end) : "",
+              label: String(r?.label ?? ""),
+              allDay: Boolean(r?.allDay ?? false),
+            }))
+            .filter((r: TenantClosedRange) => Boolean(r.date))
         );
         setServices(loadedServices);
         setProfessionals(loadedPros);
@@ -1082,6 +1169,7 @@ export default function BookingClientPage({ slug }: { slug?: string }) {
                   : []);
 
               const absencesRaw: any[] = Array.isArray(data?.absences) ? data.absences : [];
+              const closedRangesRaw: any[] = Array.isArray(data?.closedRanges) ? data.closedRanges : [];
               const oneAbsenceStart = data?.absenceStartAt ?? null;
               const oneAbsenceEnd = data?.absenceEndAt ?? null;
 
@@ -1116,6 +1204,15 @@ export default function BookingClientPage({ slug }: { slug?: string }) {
                 dayEnd: String(data?.dayEnd ?? data?.calendarDayEnd ?? "18:00"),
                 slotMin: Number(data?.slotMin ?? data?.calendarSlotMin ?? 30) || 30,
                 absences: [...absencesFromArray, ...absencesFromSingle],
+                closedRanges: closedRangesRaw
+                  .map((r) => ({
+                    date: String(r?.date ?? ""),
+                    start: r?.start ? String(r.start) : "",
+                    end: r?.end ? String(r.end) : "",
+                    allDay: Boolean(r?.allDay ?? false),
+                    label: String(r?.label ?? ""),
+                  }))
+                  .filter((r) => r.date),
                 availableSlots: availableSlotsRaw ? availableSlotsRaw.map((t: any) => String(t)) : undefined,
               };
 
@@ -1256,7 +1353,7 @@ export default function BookingClientPage({ slug }: { slug?: string }) {
     if (isTenantOpenDay(selectedDay)) return;
     const next = findNextOpenDay(selectedDay, 30);
     if (next !== selectedDay) setSelectedDay(next);
-  }, [selectedDay, tenantOpeningHours, tenantClosedDates]);
+  }, [selectedDay, tenantOpeningHours, tenantClosedDates, tenantClosedRanges]);
 
   useEffect(() => {
     if (!currentHoldId || !currentHoldExpiresAt) {

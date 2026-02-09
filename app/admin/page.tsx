@@ -34,6 +34,7 @@ type TeamMember = {
   workingDays?: number[]; // 0=Dom ... 6=Sáb
   absenceStartAt?: Timestamp | null;
   absenceEndAt?: Timestamp | null;
+  closedRanges?: ClosedRange[];
 };
 
 type Coupon = {
@@ -58,6 +59,7 @@ type WeeklyItem = {
   service?: string;
   professionalShort?: string;
   customer?: string;
+  customerPhone?: string;
   color: "blue" | "emerald";
   professionalId?: string;
   bookingStatus?: "confirmed" | "cancelled" | "completed";
@@ -85,6 +87,15 @@ type ClosedDate = {
   id: string;
   date: string; // YYYY-MM-DD
   label: string;
+};
+
+type ClosedRange = {
+  id: string;
+  date: string; // YYYY-MM-DD
+  start?: string; // "09:00"
+  end?: string; // "12:00"
+  label?: string;
+  allDay?: boolean;
 };
 
 function startOfWeekMonday(d: Date) {
@@ -210,6 +221,27 @@ function formatHHMM(d: Date) {
   return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
+function parseTimeToMinutes(t: string) {
+  const [hh, mm] = String(t || "")
+    .split(":")
+    .map((n) => Number(n));
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return NaN;
+  return hh * 60 + mm;
+}
+
+function combineYMDTimeToDate(ymd: string, time: string) {
+  return new Date(`${ymd}T${time}:00`);
+}
+
+function overlaps(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date) {
+  return aStart < bEnd && bStart < aEnd;
+}
+
+function isHoldExpired(ts?: Timestamp | null) {
+  if (!ts) return false;
+  return ts.toMillis() < Date.now();
+}
+
 function bookingStatusLabel(status?: string) {
   if (status === "cancelled") return "Cancelado";
   if (status === "completed") return "Finalizado";
@@ -251,7 +283,7 @@ function ModalShell({
         aria-label="Fechar modal"
       />
       {/* panel */}
-      <div className="relative w-full sm:max-w-[520px] bg-white rounded-3xl border border-slate-100 shadow-2xl p-5 sm:p-6 m-4 max-h-[85vh] overflow-visible">
+      <div className="relative w-full sm:max-w-[520px] bg-white rounded-3xl border border-slate-100 shadow-2xl p-5 sm:p-6 m-4 max-h-[90vh] flex flex-col">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h3 className="text-base font-extrabold text-slate-900 tracking-tight">{title}</h3>
@@ -266,7 +298,7 @@ function ModalShell({
           </button>
         </div>
 
-        <div className="mt-5 overflow-visible">{children}</div>
+        <div className="mt-5 overflow-y-auto pr-1">{children}</div>
       </div>
     </div>
   );
@@ -344,6 +376,11 @@ function AdminDashboardInner() {
   const [tenantSlug, setTenantSlug] = useState<string>(tenantId);
   const [tenantForm, setTenantForm] = useState({ name: "", phone: "", email: "", address: "" });
   const [tenantDetailsOpen, setTenantDetailsOpen] = useState<boolean>(false);
+  const [openingHoursOpen, setOpeningHoursOpen] = useState<boolean>(false);
+  const [closedDatesOpen, setClosedDatesOpen] = useState<boolean>(false);
+  const [servicesOpen, setServicesOpen] = useState<boolean>(false);
+  const [teamOpen, setTeamOpen] = useState<boolean>(false);
+  const [couponsOpen, setCouponsOpen] = useState<boolean>(false);
   const [openingHours, setOpeningHours] = useState<OpeningHour[]>(() => buildDefaultOpeningHours());
   const [closedDates, setClosedDates] = useState<ClosedDate[]>([]);
   const [closedDateInput, setClosedDateInput] = useState<string>("");
@@ -499,7 +536,13 @@ function AdminDashboardInner() {
     absenceText: "",
 
     selectedServiceIds: [] as string[], // multi
+    closedRanges: [] as ClosedRange[],
   });
+  const [proClosedRangeDateInput, setProClosedRangeDateInput] = useState<string>("");
+  const [proClosedRangeStartInput, setProClosedRangeStartInput] = useState<string>("09:00");
+  const [proClosedRangeEndInput, setProClosedRangeEndInput] = useState<string>("12:00");
+  const [proClosedRangeAllDay, setProClosedRangeAllDay] = useState<boolean>(false);
+  const [proClosedRangeLabelInput, setProClosedRangeLabelInput] = useState<string>("");
 
   const [couponModalOpen, setCouponModalOpen] = useState(false);
   const [couponEditingId, setCouponEditingId] = useState<string | null>(null);
@@ -514,6 +557,13 @@ function AdminDashboardInner() {
 
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const [bookingSelectedId, setBookingSelectedId] = useState<string | null>(null);
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleTime, setRescheduleTime] = useState("");
+  const [rescheduleProfessionalId, setRescheduleProfessionalId] = useState("");
+  const [rescheduleMonthView, setRescheduleMonthView] = useState<Date | null>(null);
+  const [rescheduleMonthBookings, setRescheduleMonthBookings] = useState<any[]>([]);
+  const [rescheduleLoading, setRescheduleLoading] = useState(false);
   const [adminBookingOpen, setAdminBookingOpen] = useState(false);
 
   // ===== Firestore: subscriptions =====
@@ -601,6 +651,16 @@ function AdminDashboardInner() {
           workingDays: normalizeWorkingDays(data?.workingDays),
           absenceStartAt: startAt,
           absenceEndAt: endAt,
+          closedRanges: Array.isArray(data?.closedRanges)
+            ? data.closedRanges.map((r: any, idx: number) => ({
+                id: String(r?.id ?? `${r?.date ?? idx}-${idx}`),
+                date: String(r?.date ?? ""),
+                start: r?.start ? String(r.start) : "",
+                end: r?.end ? String(r.end) : "",
+                label: String(r?.label ?? ""),
+                allDay: Boolean(r?.allDay ?? false),
+              }))
+            : [],
         } as TeamMember;
       });
 
@@ -747,6 +807,7 @@ function AdminDashboardInner() {
 
       const serviceName = String(b?.serviceName ?? b?.service ?? "Serviço");
       const customerName = String(b?.customerName ?? b?.customer ?? "Cliente");
+      const customerPhone = String(b?.customerPhone ?? "");
       const proName = String(b?.professionalName ?? b?.professionalShort ?? "Prof.");
       const proShort = firstName(proName);
 
@@ -759,6 +820,7 @@ function AdminDashboardInner() {
         status: "busy",
         service: serviceWithRange,
         customer: customerName,
+        customerPhone,
         professionalShort: proShort,
         professionalId: String(b?.professionalId ?? ""),
         color: idx % 2 === 0 ? "blue" : "emerald",
@@ -880,7 +942,13 @@ function AdminDashboardInner() {
       absenceText: "",
 
       selectedServiceIds: [],
+      closedRanges: [],
     });
+    setProClosedRangeDateInput("");
+    setProClosedRangeLabelInput("");
+    setProClosedRangeAllDay(false);
+    setProClosedRangeStartInput("09:00");
+    setProClosedRangeEndInput("12:00");
     setProModalOpen(true);
   }
 
@@ -911,7 +979,13 @@ function AdminDashboardInner() {
       absenceText: p.absenceLabel?.text ?? "",
 
       selectedServiceIds,
+      closedRanges: Array.isArray((p as any).closedRanges) ? ((p as any).closedRanges as ClosedRange[]) : [],
     });
+    setProClosedRangeDateInput("");
+    setProClosedRangeLabelInput("");
+    setProClosedRangeAllDay(false);
+    setProClosedRangeStartInput("09:00");
+    setProClosedRangeEndInput("12:00");
     setProModalOpen(true);
   }
 
@@ -972,6 +1046,17 @@ function AdminDashboardInner() {
       absenceText = formatAbsenceLabel("ferias", absenceStartAt, absenceEndAt);
     }
 
+    const normalizedClosedRanges = (proForm.closedRanges || [])
+      .filter((r) => r.date)
+      .map((r, idx) => ({
+        id: r.id || `${r.date}-${idx}`,
+        date: r.date,
+        start: r.allDay ? "" : String(r.start ?? ""),
+        end: r.allDay ? "" : String(r.end ?? ""),
+        label: r.label ?? "",
+        allDay: Boolean(r.allDay),
+      }));
+
     const basePayload: any = {
       name,
       active: Boolean(proForm.active),
@@ -987,6 +1072,8 @@ function AdminDashboardInner() {
 
       // Mantido para exibir no card e compat (preenchido automaticamente)
       absenceText,
+
+      closedRanges: normalizedClosedRanges,
 
       updatedAt: serverTimestamp(),
     };
@@ -1072,6 +1159,7 @@ function AdminDashboardInner() {
   function openBookingModal(bookingId: string) {
     setBookingSelectedId(bookingId);
     setBookingModalOpen(true);
+    setRescheduleOpen(false);
   }
 
   const selectedBooking = useMemo(() => {
@@ -1079,6 +1167,232 @@ function AdminDashboardInner() {
     return (weekBookings || []).find((b: any) => b?.id === bookingSelectedId) ?? null;
   }, [bookingSelectedId, weekBookings]);
   const selectedBookingStatus = String(selectedBooking?.status ?? "confirmed");
+  const rescheduleProfessional = useMemo(() => {
+    const pid = String(rescheduleProfessionalId ?? "");
+    if (!pid) return null;
+    return team.find((p) => p.id === pid) ?? null;
+  }, [rescheduleProfessionalId, team]);
+  const rescheduleDurationMin = useMemo(() => {
+    let durationMin = Number(selectedBooking?.durationMin ?? 0) || 0;
+    if (selectedBooking?.startAt?.toDate && selectedBooking?.endAt?.toDate) {
+      const s = selectedBooking.startAt.toDate();
+      const e = selectedBooking.endAt.toDate();
+      const diff = Math.round((e.getTime() - s.getTime()) / 60000);
+      if (diff > 0) durationMin = diff;
+    }
+    if (!durationMin || durationMin < 1) durationMin = 30;
+    return durationMin;
+  }, [selectedBooking]);
+
+  const rescheduleMonthStart = useMemo(() => {
+    if (!rescheduleMonthView) return null;
+    return new Date(rescheduleMonthView.getFullYear(), rescheduleMonthView.getMonth(), 1);
+  }, [rescheduleMonthView]);
+  const rescheduleMonthEnd = useMemo(() => {
+    if (!rescheduleMonthStart) return null;
+    return new Date(rescheduleMonthStart.getFullYear(), rescheduleMonthStart.getMonth() + 1, 1);
+  }, [rescheduleMonthStart]);
+
+  function getOpeningForDate(ymd: string) {
+    if (!ymd) return null;
+    const dayIndex = new Date(`${ymd}T00:00:00`).getDay();
+    const hour = openingHours.find((h) => h.dayIndex === dayIndex) ?? null;
+    if (!hour || !hour.active || !hour.start || !hour.end) return null;
+    return hour;
+  }
+
+  function getDayBlockReason(ymd: string, pro: TeamMember | null) {
+    if (!ymd) return "Selecione uma data.";
+    if (closedDates.some((c) => c.date === ymd)) return "Salão fechado nesta data.";
+    const opening = getOpeningForDate(ymd);
+    if (!opening) return "Salão fechado neste dia.";
+    if (!pro) return "Profissional não encontrado.";
+    const dayIndex = new Date(`${ymd}T00:00:00`).getDay();
+    const workingDays = normalizeWorkingDays(pro.workingDays);
+    if (!workingDays.includes(dayIndex)) return "Profissional não atende neste dia.";
+    if (pro.absenceStartAt && pro.absenceEndAt) {
+      const day = new Date(`${ymd}T00:00:00`).getTime();
+      const start = new Date(`${toYMD(pro.absenceStartAt.toDate())}T00:00:00`).getTime();
+      const end = new Date(`${toYMD(pro.absenceEndAt.toDate())}T00:00:00`).getTime();
+      if (day >= start && day <= end) return "Profissional em folga/férias.";
+    }
+    const hasAllDayClosed = (pro.closedRanges || []).some((r) => r.date === ymd && r.allDay);
+    if (hasAllDayClosed) return "Profissional com agenda fechada neste dia.";
+    return null;
+  }
+
+  function getClosedRangesForDay(pro: TeamMember | null, ymd: string) {
+    if (!pro || !ymd) return [];
+    return (pro.closedRanges || []).filter((r) => r.date === ymd);
+  }
+
+  function getBookingRange(b: any, fallbackDurationMin = 30) {
+    const startTs: Timestamp | null = b?.startAt ?? null;
+    if (!startTs) return null;
+    const start = startTs.toDate();
+    const endTs: Timestamp | null = b?.endAt ?? null;
+    if (endTs) return { start, end: endTs.toDate() };
+    const durationMin = Number(b?.durationMin ?? fallbackDurationMin) || fallbackDurationMin;
+    const end = new Date(start);
+    end.setMinutes(end.getMinutes() + durationMin);
+    return { start, end };
+  }
+
+  function getBookingsForDay(items: any[], ymd: string) {
+    return items.filter((b) => {
+      const startAt: Timestamp | null = b?.startAt ?? null;
+      if (!startAt) return false;
+      const dt = startAt.toDate();
+      return toYMD(dt) === ymd;
+    });
+  }
+
+  function buildAvailableSlotsForDay(ymd: string, dayBookings: any[], pro: TeamMember | null) {
+    if (!pro) return [];
+    const blockReason = getDayBlockReason(ymd, pro);
+    if (blockReason) return [];
+    const opening = getOpeningForDate(ymd);
+    if (!opening) return [];
+    const dayStartMin = parseTimeToMinutes(opening.start);
+    const dayEndMin = parseTimeToMinutes(opening.end);
+    if (!Number.isFinite(dayStartMin) || !Number.isFinite(dayEndMin)) return [];
+    const slotStep = 30;
+    const durationMin = rescheduleDurationMin || 30;
+    const closedRanges = getClosedRangesForDay(pro, ymd);
+    const items = dayBookings
+      .filter((b) => String(b?.professionalId ?? "") === String(rescheduleProfessionalId ?? ""))
+      .filter((b) => b?.id !== bookingSelectedId)
+      .filter((b) => {
+        if (b?.__kind === "hold" && isHoldExpired(b?.holdExpiresAt ?? null)) return false;
+        if (String(b?.status ?? "") === "cancelled") return false;
+        return true;
+      });
+
+    const slots: string[] = [];
+    for (let startMin = dayStartMin; startMin + durationMin <= dayEndMin; startMin += slotStep) {
+      const endMin = startMin + durationMin;
+      const timeStr = `${String(Math.floor(startMin / 60)).padStart(2, "0")}:${String(startMin % 60).padStart(2, "0")}`;
+      const rangeStart = combineYMDTimeToDate(ymd, timeStr);
+      const rangeEnd = new Date(rangeStart);
+      rangeEnd.setMinutes(rangeEnd.getMinutes() + durationMin);
+
+      const blockedByClosed = closedRanges.some((r) => {
+        if (r.allDay) return true;
+        const rStart = parseTimeToMinutes(String(r.start || ""));
+        const rEnd = parseTimeToMinutes(String(r.end || ""));
+        if (!Number.isFinite(rStart) || !Number.isFinite(rEnd)) return false;
+        return startMin < rEnd && endMin > rStart;
+      });
+      if (blockedByClosed) continue;
+
+      const hasConflict = items.some((b) => {
+        const range = getBookingRange(b, durationMin);
+        if (!range) return false;
+        return overlaps(rangeStart, rangeEnd, range.start, range.end);
+      });
+      if (hasConflict) continue;
+
+      slots.push(timeStr);
+    }
+    return slots;
+  }
+
+  useEffect(() => {
+    if (!bookingModalOpen) return;
+    const startAt = selectedBooking?.startAt?.toDate ? selectedBooking.startAt.toDate() : null;
+    if (!startAt) return;
+    setRescheduleDate(toYMD(startAt));
+    setRescheduleTime(formatHHMM(startAt));
+    setRescheduleProfessionalId(String(selectedBooking?.professionalId ?? ""));
+    setRescheduleMonthView(new Date(startAt.getFullYear(), startAt.getMonth(), 1));
+  }, [bookingModalOpen, selectedBooking]);
+
+  useEffect(() => {
+    if (!rescheduleOpen || !rescheduleMonthStart || !rescheduleMonthEnd) {
+      setRescheduleMonthBookings([]);
+      return;
+    }
+    let alive = true;
+    async function loadMonthBookings() {
+      if (!tenantId) return;
+      setRescheduleLoading(true);
+      try {
+        const startTs = Timestamp.fromDate(rescheduleMonthStart);
+        const endTs = Timestamp.fromDate(rescheduleMonthEnd);
+        const bookingsRef = collection(db, "tenants", tenantId, "bookings");
+        const holdsRef = collection(db, "tenants", tenantId, "holds");
+
+        const [bookingsSnap, holdsSnap] = await Promise.all([
+          getDocs(query(bookingsRef, where("startAt", ">=", startTs), where("startAt", "<", endTs), orderBy("startAt", "asc"))),
+          getDocs(query(holdsRef, where("startAt", ">=", startTs), where("startAt", "<", endTs), orderBy("startAt", "asc"))),
+        ]);
+
+        const bookings = bookingsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any), __kind: "booking" }));
+        const holds = holdsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any), __kind: "hold" }));
+
+        if (!alive) return;
+        setRescheduleMonthBookings([...bookings, ...holds]);
+      } catch (e) {
+        if (!alive) return;
+        setRescheduleMonthBookings([]);
+      } finally {
+        if (alive) setRescheduleLoading(false);
+      }
+    }
+    loadMonthBookings();
+    return () => {
+      alive = false;
+    };
+  }, [rescheduleOpen, rescheduleMonthStart, rescheduleMonthEnd, tenantId]);
+
+  const rescheduleSlots = useMemo(() => {
+    if (!rescheduleOpen || !rescheduleDate || !rescheduleProfessional) return [];
+    const dayBookings = getBookingsForDay(rescheduleMonthBookings, rescheduleDate);
+    return buildAvailableSlotsForDay(rescheduleDate, dayBookings, rescheduleProfessional);
+  }, [
+    rescheduleOpen,
+    rescheduleDate,
+    rescheduleProfessional,
+    rescheduleMonthBookings,
+    bookingSelectedId,
+    rescheduleDurationMin,
+    rescheduleProfessionalId,
+    openingHours,
+    closedDates,
+  ]);
+
+  useEffect(() => {
+    if (!rescheduleOpen || !rescheduleDate) return;
+    if (rescheduleSlots.length === 0) return;
+    if (!rescheduleSlots.includes(rescheduleTime)) {
+      setRescheduleTime(rescheduleSlots[0]);
+    }
+  }, [rescheduleOpen, rescheduleDate, rescheduleSlots, rescheduleTime]);
+
+  useEffect(() => {
+    if (!rescheduleOpen) return;
+    if (!rescheduleDate) return;
+    const d = new Date(`${rescheduleDate}T00:00:00`);
+    if (Number.isNaN(d.getTime())) return;
+    const next = new Date(d.getFullYear(), d.getMonth(), 1);
+    if (!rescheduleMonthView || rescheduleMonthView.getTime() !== next.getTime()) {
+      setRescheduleMonthView(next);
+    }
+  }, [rescheduleOpen, rescheduleDate, rescheduleMonthView]);
+
+  const rescheduleAvailabilityMap = useMemo(() => {
+    if (!rescheduleMonthStart || !rescheduleMonthView || !rescheduleProfessional) return new Map<string, boolean>();
+    const daysInMonth = new Date(rescheduleMonthView.getFullYear(), rescheduleMonthView.getMonth() + 1, 0).getDate();
+    const map = new Map<string, boolean>();
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(rescheduleMonthView.getFullYear(), rescheduleMonthView.getMonth(), day);
+      const ymd = toYMD(date);
+      const dayBookings = getBookingsForDay(rescheduleMonthBookings, ymd);
+      const slots = buildAvailableSlotsForDay(ymd, dayBookings, rescheduleProfessional);
+      map.set(ymd, slots.length > 0);
+    }
+    return map;
+  }, [rescheduleMonthStart, rescheduleMonthView, rescheduleProfessional, rescheduleMonthBookings]);
 
   async function updateBookingStatus(nextStatus: "cancelled" | "completed") {
     if (!bookingSelectedId) return;
@@ -1094,6 +1408,85 @@ function AdminDashboardInner() {
       setBookingModalOpen(false);
     } catch (e: any) {
       alert(e?.message ?? "Erro ao atualizar o status do agendamento.");
+    }
+  }
+
+  async function hasConflictForRange(pid: string, rangeStart: Date, rangeEnd: Date, occYmd: string) {
+    const start = new Date(`${occYmd}T00:00:00`);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    const startTs = Timestamp.fromDate(start);
+    const endTs = Timestamp.fromDate(end);
+    const bookingsRef = collection(db, "tenants", tenantId, "bookings");
+    const holdsRef = collection(db, "tenants", tenantId, "holds");
+
+    const [bookingsSnap, holdsSnap] = await Promise.all([
+      getDocs(query(bookingsRef, where("startAt", ">=", startTs), where("startAt", "<", endTs), orderBy("startAt", "asc"))),
+      getDocs(query(holdsRef, where("startAt", ">=", startTs), where("startAt", "<", endTs), orderBy("startAt", "asc"))),
+    ]);
+
+    const items = [
+      ...bookingsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any), __kind: "booking" })),
+      ...holdsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any), __kind: "hold" })),
+    ];
+
+    return items.some((b) => {
+      if (String(b?.professionalId ?? "") !== String(pid)) return false;
+      if (b?.id === bookingSelectedId) return false;
+      if (b?.__kind === "hold" && isHoldExpired(b?.holdExpiresAt ?? null)) return false;
+      if (String(b?.status ?? "") === "cancelled") return false;
+      const range = getBookingRange(b, rescheduleDurationMin);
+      if (!range) return false;
+      return overlaps(rangeStart, rangeEnd, range.start, range.end);
+    });
+  }
+
+  async function rescheduleBooking() {
+    if (!bookingSelectedId) return;
+    if (!rescheduleDate || !rescheduleTime) {
+      return alert("Informe a nova data e horário.");
+    }
+    if (!selectedBooking) return;
+    try {
+      const blockReason = getDayBlockReason(rescheduleDate, rescheduleProfessional);
+      if (blockReason) {
+        return alert(blockReason);
+      }
+      if (rescheduleSlots.length > 0 && !rescheduleSlots.includes(rescheduleTime)) {
+        return alert("Horário indisponível. Selecione um horário disponível.");
+      }
+      const bookingRef = doc(db, "tenants", tenantId, "bookings", bookingSelectedId);
+      const newStart = new Date(`${rescheduleDate}T${rescheduleTime}:00`);
+
+      let durationMin = rescheduleDurationMin || 30;
+
+      const newEnd = new Date(newStart);
+      newEnd.setMinutes(newEnd.getMinutes() + durationMin);
+
+      const pid = String(rescheduleProfessionalId ?? selectedBooking?.professionalId ?? "");
+      if (pid) {
+        const conflict = await hasConflictForRange(pid, newStart, newEnd, rescheduleDate);
+        if (conflict) {
+          return alert("Conflito de agenda encontrado. Escolha outro horário.");
+        }
+      }
+
+      const proName =
+        team.find((p) => p.id === String(rescheduleProfessionalId ?? ""))?.name ??
+        String(selectedBooking?.professionalName ?? "");
+
+      await updateDoc(bookingRef, {
+        startAt: Timestamp.fromDate(newStart),
+        endAt: Timestamp.fromDate(newEnd),
+        professionalId: rescheduleProfessionalId || selectedBooking?.professionalId || "",
+        professionalName: proName,
+        status: "confirmed",
+        updatedAt: serverTimestamp(),
+        rescheduledAt: serverTimestamp(),
+      });
+      setBookingModalOpen(false);
+    } catch (e: any) {
+      alert(e?.message ?? "Erro ao reagendar a reserva.");
     }
   }
 
@@ -1291,315 +1684,420 @@ function AdminDashboardInner() {
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-slate-900 text-sm font-bold uppercase tracking-wider">Horários de Funcionamento</h3>
-              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
-                {openingHours.map((h) => (
-                  <div key={h.dayIndex} className={["p-4 flex items-center justify-between", h.active ? "" : "opacity-60"].join(" ")}>
-                    <div className="flex items-center gap-3">
-                      <input
-                        checked={h.active}
-                        onChange={(e) =>
-                          setOpeningHours((prev) =>
-                            prev.map((x) => (x.dayIndex === h.dayIndex ? { ...x, active: e.target.checked } : x))
-                          )
-                        }
-                        className="w-5 h-5 rounded text-primary border-slate-300 focus:ring-primary"
-                        type="checkbox"
-                      />
-                      <span className="text-sm font-medium">{h.label}</span>
-                    </div>
-                    {h.active ? (
-                      <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
+              <button
+                type="button"
+                onClick={() => setOpeningHoursOpen((v) => !v)}
+                className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-2xl p-4 text-left"
+              >
+                <div className="flex flex-col">
+                  <h3 className="text-slate-900 text-sm font-bold uppercase tracking-wider">Horários de Funcionamento</h3>
+                  <span className="text-[11px] text-slate-500">
+                    {openingHoursOpen ? "Toque para ocultar" : "Toque para expandir"}
+                  </span>
+                </div>
+                <span className="material-symbols-outlined text-slate-400">
+                  {openingHoursOpen ? "expand_less" : "expand_more"}
+                </span>
+              </button>
+
+              {openingHoursOpen ? (
+                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
+                  {openingHours.map((h) => (
+                    <div
+                      key={h.dayIndex}
+                      className={["p-4 flex items-center justify-between", h.active ? "" : "opacity-60"].join(" ")}
+                    >
+                      <div className="flex items-center gap-3">
                         <input
-                          type="time"
-                          className="px-2 py-1 bg-slate-100 rounded-md border border-slate-200"
-                          value={h.start}
+                          checked={h.active}
                           onChange={(e) =>
                             setOpeningHours((prev) =>
-                              prev.map((x) => (x.dayIndex === h.dayIndex ? { ...x, start: e.target.value } : x))
+                              prev.map((x) => (x.dayIndex === h.dayIndex ? { ...x, active: e.target.checked } : x))
                             )
                           }
+                          className="w-5 h-5 rounded text-primary border-slate-300 focus:ring-primary"
+                          type="checkbox"
                         />
-                        <span>às</span>
-                        <input
-                          type="time"
-                          className="px-2 py-1 bg-slate-100 rounded-md border border-slate-200"
-                          value={h.end}
-                          onChange={(e) =>
-                            setOpeningHours((prev) =>
-                              prev.map((x) => (x.dayIndex === h.dayIndex ? { ...x, end: e.target.value } : x))
-                            )
-                          }
-                        />
+                        <span className="text-sm font-medium">{h.label}</span>
                       </div>
-                    ) : (
-                      <span className="text-xs font-medium text-slate-400 italic">Fechado</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-slate-900 text-sm font-bold uppercase tracking-wider">Datas Exceção (Fechado)</h3>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!closedDateInput) return;
-                    const id = `${closedDateInput}-${Date.now()}`;
-                    setClosedDates((prev) => [
-                      ...prev,
-                      { id, date: closedDateInput, label: closedLabelInput.trim() },
-                    ]);
-                    setClosedDateInput("");
-                    setClosedLabelInput("");
-                  }}
-                  className="text-primary text-xs font-bold flex items-center gap-1"
-                >
-                  <span className="material-symbols-outlined text-base">add_circle</span>
-                  Adicionar
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="date"
-                  className="h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                  value={closedDateInput}
-                  onChange={(e) => setClosedDateInput(e.target.value)}
-                />
-                <input
-                  type="text"
-                  className="h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                  placeholder="Motivo (ex: Natal)"
-                  value={closedLabelInput}
-                  onChange={(e) => setClosedLabelInput(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                {closedDates.length === 0 ? (
-                  <div className="p-3 bg-white border border-slate-200 rounded-xl text-[11px] text-slate-400 font-semibold">
-                    Nenhuma data de exceção cadastrada.
-                  </div>
-                ) : (
-                  closedDates.map((c) => (
-                    <div key={c.id} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-xl">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-slate-100 flex flex-col items-center justify-center">
-                          <span className="text-[10px] leading-none text-slate-500 uppercase font-bold">
-                            {c.date ? new Date(c.date + "T00:00:00").toLocaleString("pt-BR", { month: "short" }) : "—"}
-                          </span>
-                          <span className="text-sm font-bold text-primary">
-                            {c.date ? String(new Date(c.date + "T00:00:00").getDate()).padStart(2, "0") : "--"}
-                          </span>
-                        </div>
-                        <span className="text-sm font-medium">{c.label || "Fechado"}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setClosedDates((prev) => prev.filter((x) => x.id !== c.id))}
-                        className="text-slate-300 hover:text-red-500 transition-colors"
-                      >
-                        <span className="material-symbols-outlined">delete</span>
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary">content_cut</span>
-                  <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Funções / Serviços</h4>
-                </div>
-                <button
-                  onClick={openCreateService}
-                  className="text-[11px] font-bold text-primary bg-primary/5 px-3 py-1.5 rounded-full"
-                >
-                  + Novo Serviço
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4">
-                {services.map((s) => (
-                  <div key={s.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="size-12 rounded-2xl bg-slate-100 flex items-center justify-center overflow-hidden">
-                          <span className="material-symbols-outlined text-slate-400">{s.icon ?? "content_cut"}</span>
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-slate-800">{s.name}</p>
-                          <p className="text-[10px] text-slate-500 font-medium">
-                            {s.durationMin} min • R$ {Number(s.price).toFixed(2).replace(".", ",")}
-                          </p>
-                        </div>
-                      </div>
-
-                      <button className="text-slate-300" onClick={() => openEditService(s)}>
-                        <span className="material-symbols-outlined">edit</span>
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
-                      <div className="bg-slate-50 p-2 rounded-xl">
-                        <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Status</p>
-                        <p className="text-[10px] font-semibold text-slate-700">{s.active ? "Ativo" : "Inativo"}</p>
-                      </div>
-                      <div className="bg-slate-50 p-2 rounded-xl">
-                        <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Profissionais</p>
-                        <p className="text-[10px] font-semibold text-slate-700">
-                          {String((s.professionalIds || []).length).padStart(2, "0")} vinculados
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                {services.length === 0 && (
-                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-                    <p className="text-[11px] font-semibold text-slate-400">
-                      Nenhum serviço cadastrado ainda. Clique em <span className="text-primary font-bold">+ Novo Serviço</span>.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary">diversity_3</span>
-                  <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Equipe</h4>
-                </div>
-                <button
-                  onClick={openCreateProfessional}
-                  className="text-[11px] font-bold text-primary bg-primary/5 px-3 py-1.5 rounded-full"
-                >
-                  + Profissional
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4">
-                {team.map((m) => (
-                  <div key={m.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="size-12 rounded-2xl bg-slate-100 flex items-center justify-center overflow-hidden">
-                          <span className="text-sm font-black text-slate-600">{initialsFromName(m.name)}</span>
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-slate-800">{m.name}</p>
-                        </div>
-                      </div>
-                      <button className="text-slate-300" onClick={() => openEditProfessional(m)}>
-                        <span className="material-symbols-outlined">edit</span>
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
-                      <div className="bg-slate-50 p-2 rounded-xl">
-                        <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Serviços</p>
-                        <p className="text-[10px] font-semibold text-slate-700">
-                          {String(m.servicesActive).padStart(2, "0")} Ativos
-                        </p>
-                      </div>
-
-                      {m.absenceLabel?.kind === "ausencia" ? (
-                        <div className="bg-amber-50 p-2 rounded-xl">
-                          <p className="text-[9px] font-bold text-amber-600 uppercase mb-1">Ausências</p>
-                          <p className="text-[10px] font-semibold text-amber-700">{m.absenceLabel.text}</p>
-                        </div>
-                      ) : m.absenceLabel?.kind === "ferias" ? (
-                        <div className="bg-blue-50 p-2 rounded-xl">
-                          <p className="text-[9px] font-bold text-blue-600 uppercase mb-1">Férias</p>
-                          <p className="text-[10px] font-semibold text-blue-700">{m.absenceLabel.text}</p>
+                      {h.active ? (
+                        <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
+                          <input
+                            type="time"
+                            className="px-2 py-1 bg-slate-100 rounded-md border border-slate-200"
+                            value={h.start}
+                            onChange={(e) =>
+                              setOpeningHours((prev) =>
+                                prev.map((x) => (x.dayIndex === h.dayIndex ? { ...x, start: e.target.value } : x))
+                              )
+                            }
+                          />
+                          <span>às</span>
+                          <input
+                            type="time"
+                            className="px-2 py-1 bg-slate-100 rounded-md border border-slate-200"
+                            value={h.end}
+                            onChange={(e) =>
+                              setOpeningHours((prev) =>
+                                prev.map((x) => (x.dayIndex === h.dayIndex ? { ...x, end: e.target.value } : x))
+                              )
+                            }
+                          />
                         </div>
                       ) : (
-                        <div className="bg-slate-50 p-2 rounded-xl">
-                          <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Status</p>
-                          <p className="text-[10px] font-semibold text-slate-700">{m.active ? "Ativo" : "Inativo"}</p>
-                        </div>
+                        <span className="text-xs font-medium text-slate-400 italic">Fechado</span>
                       )}
                     </div>
-                  </div>
-                ))}
-
-                {team.length === 0 && (
-                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-                    <p className="text-[11px] font-semibold text-slate-400">
-                      Nenhum profissional cadastrado ainda. Clique em <span className="text-primary font-bold">+ Profissional</span>.
-                    </p>
-                  </div>
-                )}
-              </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
 
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary">confirmation_number</span>
-                  <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Cupons</h4>
+              <button
+                type="button"
+                onClick={() => setClosedDatesOpen((v) => !v)}
+                className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-2xl p-4 text-left"
+              >
+                <div className="flex flex-col">
+                  <h3 className="text-slate-900 text-sm font-bold uppercase tracking-wider">Datas Exceção (Fechado)</h3>
+                  <span className="text-[11px] text-slate-500">
+                    {closedDatesOpen ? "Toque para ocultar" : "Toque para expandir"}
+                  </span>
                 </div>
-                <button
-                  onClick={openCreateCoupon}
-                  className="text-[11px] font-bold text-primary bg-primary/5 px-3 py-1.5 rounded-full"
-                >
-                  + Novo Cupom
-                </button>
-              </div>
+                <span className="material-symbols-outlined text-slate-400">
+                  {closedDatesOpen ? "expand_less" : "expand_more"}
+                </span>
+              </button>
 
-              {coupons.map((c) => (
-                <div key={c.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <span className="text-xs font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded-lg">{c.code}</span>
-                      <span
-                        className={[
-                          "ml-2 text-[10px] font-bold",
-                          c.status === "Ativo" ? "text-emerald-600" : "text-slate-400",
-                        ].join(" ")}
-                      >
-                        {c.status}
-                      </span>
+              {closedDatesOpen ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!closedDateInput) return;
+                        const id = `${closedDateInput}-${Date.now()}`;
+                        setClosedDates((prev) => [
+                          ...prev,
+                          { id, date: closedDateInput, label: closedLabelInput.trim() },
+                        ]);
+                        setClosedDateInput("");
+                        setClosedLabelInput("");
+                      }}
+                      className="text-primary text-xs font-bold flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-base">add_circle</span>
+                      Adicionar
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="date"
+                      className="h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                      value={closedDateInput}
+                      onChange={(e) => setClosedDateInput(e.target.value)}
+                    />
+                    <input
+                      type="text"
+                      className="h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                      placeholder="Motivo (ex: Natal)"
+                      value={closedLabelInput}
+                      onChange={(e) => setClosedLabelInput(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    {closedDates.length === 0 ? (
+                      <div className="p-3 bg-white border border-slate-200 rounded-xl text-[11px] text-slate-400 font-semibold">
+                        Nenhuma data de exceção cadastrada.
+                      </div>
+                    ) : (
+                      closedDates.map((c) => (
+                        <div key={c.id} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-xl">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-slate-100 flex flex-col items-center justify-center">
+                              <span className="text-[10px] leading-none text-slate-500 uppercase font-bold">
+                                {c.date ? new Date(c.date + "T00:00:00").toLocaleString("pt-BR", { month: "short" }) : "—"}
+                              </span>
+                              <span className="text-sm font-bold text-primary">
+                                {c.date ? String(new Date(c.date + "T00:00:00").getDate()).padStart(2, "0") : "--"}
+                              </span>
+                            </div>
+                            <span className="text-sm font-medium">{c.label || "Fechado"}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setClosedDates((prev) => prev.filter((x) => x.id !== c.id))}
+                            className="text-slate-300 hover:text-red-500 transition-colors"
+                          >
+                            <span className="material-symbols-outlined">delete</span>
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </>
+              ) : null}
+            </div>
+
+            <div className="space-y-4">
+              <button
+                type="button"
+                onClick={() => setServicesOpen((v) => !v)}
+                className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-2xl p-4 text-left"
+              >
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary">content_cut</span>
+                    <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Funções / Serviços</h4>
+                  </div>
+                  <span className="text-[11px] text-slate-500">
+                    {servicesOpen ? "Toque para ocultar" : "Toque para expandir"}
+                  </span>
+                </div>
+                <span className="material-symbols-outlined text-slate-400">
+                  {servicesOpen ? "expand_less" : "expand_more"}
+                </span>
+              </button>
+
+              {servicesOpen ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div />
+                    <button
+                      onClick={openCreateService}
+                      className="text-[11px] font-bold text-primary bg-primary/5 px-3 py-1.5 rounded-full"
+                    >
+                      + Novo Serviço
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4">
+                    {services.map((s) => (
+                      <div key={s.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="size-12 rounded-2xl bg-slate-100 flex items-center justify-center overflow-hidden">
+                              <span className="material-symbols-outlined text-slate-400">{s.icon ?? "content_cut"}</span>
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-slate-800">{s.name}</p>
+                              <p className="text-[10px] text-slate-500 font-medium">
+                                {s.durationMin} min • R$ {Number(s.price).toFixed(2).replace(".", ",")}
+                              </p>
+                            </div>
+                          </div>
+
+                          <button className="text-slate-300" onClick={() => openEditService(s)}>
+                            <span className="material-symbols-outlined">edit</span>
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+                          <div className="bg-slate-50 p-2 rounded-xl">
+                            <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Status</p>
+                            <p className="text-[10px] font-semibold text-slate-700">{s.active ? "Ativo" : "Inativo"}</p>
+                          </div>
+                          <div className="bg-slate-50 p-2 rounded-xl">
+                            <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Profissionais</p>
+                            <p className="text-[10px] font-semibold text-slate-700">
+                              {String((s.professionalIds || []).length).padStart(2, "0")} vinculados
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    {services.length === 0 && (
+                      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+                        <p className="text-[11px] font-semibold text-slate-400">
+                          Nenhum serviço cadastrado ainda. Clique em{" "}
+                          <span className="text-primary font-bold">+ Novo Serviço</span>.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : null}
+            </div>
+
+            <div className="space-y-4">
+              <button
+                type="button"
+                onClick={() => setTeamOpen((v) => !v)}
+                className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-2xl p-4 text-left"
+              >
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary">diversity_3</span>
+                    <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Equipe</h4>
+                  </div>
+                  <span className="text-[11px] text-slate-500">
+                    {teamOpen ? "Toque para ocultar" : "Toque para expandir"}
+                  </span>
+                </div>
+                <span className="material-symbols-outlined text-slate-400">
+                  {teamOpen ? "expand_less" : "expand_more"}
+                </span>
+              </button>
+
+              {teamOpen ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div />
+                    <button
+                      onClick={openCreateProfessional}
+                      className="text-[11px] font-bold text-primary bg-primary/5 px-3 py-1.5 rounded-full"
+                    >
+                      + Profissional
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4">
+                    {team.map((m) => (
+                      <div key={m.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="size-12 rounded-2xl bg-slate-100 flex items-center justify-center overflow-hidden">
+                              <span className="text-sm font-black text-slate-600">{initialsFromName(m.name)}</span>
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-slate-800">{m.name}</p>
+                            </div>
+                          </div>
+                          <button className="text-slate-300" onClick={() => openEditProfessional(m)}>
+                            <span className="material-symbols-outlined">edit</span>
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+                          <div className="bg-slate-50 p-2 rounded-xl">
+                            <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Serviços</p>
+                            <p className="text-[10px] font-semibold text-slate-700">
+                              {String(m.servicesActive).padStart(2, "0")} Ativos
+                            </p>
+                          </div>
+
+                          {m.absenceLabel?.kind === "ausencia" ? (
+                            <div className="bg-amber-50 p-2 rounded-xl">
+                              <p className="text-[9px] font-bold text-amber-600 uppercase mb-1">Ausências</p>
+                              <p className="text-[10px] font-semibold text-amber-700">{m.absenceLabel.text}</p>
+                            </div>
+                          ) : m.absenceLabel?.kind === "ferias" ? (
+                            <div className="bg-blue-50 p-2 rounded-xl">
+                              <p className="text-[9px] font-bold text-blue-600 uppercase mb-1">Férias</p>
+                              <p className="text-[10px] font-semibold text-blue-700">{m.absenceLabel.text}</p>
+                            </div>
+                          ) : (
+                            <div className="bg-slate-50 p-2 rounded-xl">
+                              <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Status</p>
+                              <p className="text-[10px] font-semibold text-slate-700">{m.active ? "Ativo" : "Inativo"}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+
+                    {team.length === 0 && (
+                      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+                        <p className="text-[11px] font-semibold text-slate-400">
+                          Nenhum profissional cadastrado ainda. Clique em{" "}
+                          <span className="text-primary font-bold">+ Profissional</span>.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : null}
+            </div>
+
+            <div className="space-y-4">
+              <button
+                type="button"
+                onClick={() => setCouponsOpen((v) => !v)}
+                className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-2xl p-4 text-left"
+              >
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary">confirmation_number</span>
+                    <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Cupons</h4>
+                  </div>
+                  <span className="text-[11px] text-slate-500">
+                    {couponsOpen ? "Toque para ocultar" : "Toque para expandir"}
+                  </span>
+                </div>
+                <span className="material-symbols-outlined text-slate-400">
+                  {couponsOpen ? "expand_less" : "expand_more"}
+                </span>
+              </button>
+
+              {couponsOpen ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div />
+                    <button
+                      onClick={openCreateCoupon}
+                      className="text-[11px] font-bold text-primary bg-primary/5 px-3 py-1.5 rounded-full"
+                    >
+                      + Novo Cupom
+                    </button>
+                  </div>
+
+                  {coupons.map((c) => (
+                    <div key={c.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <span className="text-xs font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded-lg">
+                            {c.code}
+                          </span>
+                          <span
+                            className={[
+                              "ml-2 text-[10px] font-bold",
+                              c.status === "Ativo" ? "text-emerald-600" : "text-slate-400",
+                            ].join(" ")}
+                          >
+                            {c.status}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-primary">{c.percentOff}% OFF</span>
+                          <button className="text-slate-300" onClick={() => openEditCoupon(c)}>
+                            <span className="material-symbols-outlined">edit</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 mb-4">
+                        <span className="material-symbols-outlined text-xs text-slate-400">person_search</span>
+                        <span className="text-[10px] text-slate-500 font-medium italic">Vinculado a: {c.linkedTo}</span>
+                      </div>
+
+                      <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="bg-primary h-full" style={{ width: `${c.progressPct}%` }} />
+                      </div>
+                      <div className="flex justify-between mt-1.5">
+                        <span className="text-[9px] font-bold text-slate-400">
+                          {c.used}/{c.maxUses} USADOS
+                        </span>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase">Expira: {c.expiresLabel}</span>
+                      </div>
                     </div>
+                  ))}
 
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-primary">{c.percentOff}% OFF</span>
-                      <button className="text-slate-300" onClick={() => openEditCoupon(c)}>
-                        <span className="material-symbols-outlined">edit</span>
-                      </button>
+                  {coupons.length === 0 && (
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+                      <p className="text-[11px] font-semibold text-slate-400">
+                        Nenhum cupom cadastrado ainda. Clique em{" "}
+                        <span className="text-primary font-bold">+ Novo Cupom</span>.
+                      </p>
                     </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="material-symbols-outlined text-xs text-slate-400">person_search</span>
-                    <span className="text-[10px] text-slate-500 font-medium italic">Vinculado a: {c.linkedTo}</span>
-                  </div>
-
-                  <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="bg-primary h-full" style={{ width: `${c.progressPct}%` }} />
-                  </div>
-                  <div className="flex justify-between mt-1.5">
-                    <span className="text-[9px] font-bold text-slate-400">
-                      {c.used}/{c.maxUses} USADOS
-                    </span>
-                    <span className="text-[9px] font-bold text-slate-400 uppercase">Expira: {c.expiresLabel}</span>
-                  </div>
-                </div>
-              ))}
-
-              {coupons.length === 0 && (
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-                  <p className="text-[11px] font-semibold text-slate-400">
-                    Nenhum cupom cadastrado ainda. Clique em <span className="text-primary font-bold">+ Novo Cupom</span>.
-                  </p>
-                </div>
-              )}
+                  )}
+                </>
+              ) : null}
             </div>
 
             <div className="pt-4">
@@ -1743,16 +2241,29 @@ function AdminDashboardInner() {
                               </div>
                               <div>
                                 <h5 className="text-sm font-bold text-slate-900">{item.customer}</h5>
-                                <p className="text-xs text-slate-500">{item.service}</p>
-                                <div className="flex items-center gap-1 mt-1 text-primary">
+                                {item.customerPhone ? (
+                                  <p className="text-[11px] text-slate-400">
+                                    WhatsApp: {formatPhoneBR(item.customerPhone)}
+                                  </p>
+                                ) : null}
+                                <p className="text-xs text-slate-500 mt-1">{item.service}</p>
+                                <div className="flex items-center gap-1 mt-2 text-primary">
                                   <span className="material-symbols-outlined text-sm">schedule</span>
                                   <span className="text-xs font-bold uppercase tracking-wide">{item.time}</span>
                                 </div>
                               </div>
                             </div>
-                            <span className="px-2 py-1 rounded-md bg-green-100 text-green-600 text-[10px] font-bold uppercase tracking-wider">
-                              {bookingStatusLabel(item.bookingStatus)}
-                            </span>
+                            <div className="flex flex-col items-end gap-2">
+                              <span className="px-2 py-1 rounded-md bg-green-100 text-green-600 text-[10px] font-bold uppercase tracking-wider">
+                                {bookingStatusLabel(item.bookingStatus)}
+                              </span>
+                              {item.professionalShort ? (
+                                <div className="flex items-center justify-end gap-1 text-[11px] font-semibold text-slate-500">
+                                  <span className="material-symbols-outlined text-[14px]">person</span>
+                                  <span>{item.professionalShort}</span>
+                                </div>
+                              ) : null}
+                            </div>
                           </div>
                           <div className="flex gap-2 pt-1 border-t border-slate-50">
                             <button
@@ -1765,11 +2276,15 @@ function AdminDashboardInner() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => openBookingModal(item.id)}
+                              onClick={() => {
+                                const phone = String(item.customerPhone ?? "").replace(/\D/g, "");
+                                if (!phone) return alert("WhatsApp do cliente não informado.");
+                                window.open(`https://wa.me/55${phone}`, "_blank");
+                              }}
                               className="flex-1 h-9 rounded-lg bg-primary text-white text-xs font-bold flex items-center justify-center gap-1"
                             >
-                              <span className="material-symbols-outlined text-base">check</span>
-                              Abrir
+                              <span className="material-symbols-outlined text-base">chat</span>
+                              WhatsApp
                             </button>
                           </div>
                         </>
@@ -1860,7 +2375,7 @@ function AdminDashboardInner() {
                     Status de Reservas por Profissional
                   </h4>
                 </div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mês</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest"></span>
               </div>
 
               <div className="grid grid-cols-1 gap-3">
@@ -1912,7 +2427,7 @@ function AdminDashboardInner() {
                     Novos x Recorrentes
                   </h4>
                 </div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mês</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest"></span>
               </div>
 
               <div className="grid grid-cols-3 gap-3">
@@ -2300,6 +2815,131 @@ function AdminDashboardInner() {
               </div>
             ) : null}
 
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  Fechar agenda (imprevisto)
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!proClosedRangeDateInput) return;
+                    if (!proClosedRangeAllDay) {
+                      if (!proClosedRangeStartInput || !proClosedRangeEndInput) {
+                        return alert("Informe o horário de início e fim.");
+                      }
+                      if (proClosedRangeStartInput >= proClosedRangeEndInput) {
+                        return alert("O horário final precisa ser maior que o inicial.");
+                      }
+                    }
+                    const id = `${proClosedRangeDateInput}-${Date.now()}`;
+                    const newRange: ClosedRange = {
+                      id,
+                      date: proClosedRangeDateInput,
+                      start: proClosedRangeAllDay ? "" : proClosedRangeStartInput,
+                      end: proClosedRangeAllDay ? "" : proClosedRangeEndInput,
+                      label: proClosedRangeLabelInput.trim(),
+                      allDay: proClosedRangeAllDay,
+                    };
+                    setProForm((p) => ({ ...p, closedRanges: [...(p.closedRanges || []), newRange] }));
+                    setProClosedRangeDateInput("");
+                    setProClosedRangeLabelInput("");
+                    setProClosedRangeAllDay(false);
+                  }}
+                  className="text-primary text-[10px] font-bold flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-sm">add_circle</span>
+                  Adicionar
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="date"
+                  className="h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all"
+                  value={proClosedRangeDateInput}
+                  onChange={(e) => setProClosedRangeDateInput(e.target.value)}
+                />
+                <input
+                  type="text"
+                  className="h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all"
+                  placeholder="Motivo (opcional)"
+                  value={proClosedRangeLabelInput}
+                  onChange={(e) => setProClosedRangeLabelInput(e.target.value)}
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={proClosedRangeAllDay}
+                    onChange={(e) => setProClosedRangeAllDay(e.target.checked)}
+                    className="w-4 h-4 rounded text-primary border-slate-300 focus:ring-primary"
+                  />
+                  Dia inteiro
+                </label>
+                <div className="flex items-center gap-2 text-[11px] font-medium text-slate-600">
+                  <input
+                    type="time"
+                    className="px-2 py-1 bg-slate-100 rounded-md border border-slate-200 disabled:opacity-50"
+                    value={proClosedRangeStartInput}
+                    onChange={(e) => setProClosedRangeStartInput(e.target.value)}
+                    disabled={proClosedRangeAllDay}
+                  />
+                  <span>às</span>
+                  <input
+                    type="time"
+                    className="px-2 py-1 bg-slate-100 rounded-md border border-slate-200 disabled:opacity-50"
+                    value={proClosedRangeEndInput}
+                    onChange={(e) => setProClosedRangeEndInput(e.target.value)}
+                    disabled={proClosedRangeAllDay}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {(proForm.closedRanges || []).length === 0 ? (
+                  <div className="p-3 bg-white border border-slate-200 rounded-xl text-[11px] text-slate-400 font-semibold">
+                    Nenhum fechamento rápido cadastrado.
+                  </div>
+                ) : (
+                  (proForm.closedRanges || []).map((r) => (
+                    <div key={r.id} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-slate-100 flex flex-col items-center justify-center">
+                          <span className="text-[10px] leading-none text-slate-500 uppercase font-bold">
+                            {r.date ? new Date(r.date + "T00:00:00").toLocaleString("pt-BR", { month: "short" }) : "—"}
+                          </span>
+                          <span className="text-sm font-bold text-primary">
+                            {r.date ? String(new Date(r.date + "T00:00:00").getDate()).padStart(2, "0") : "--"}
+                          </span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium">{r.label || "Fechamento"}</span>
+                          <span className="text-[11px] text-slate-500">
+                            {r.allDay ? "Dia inteiro" : `${r.start || "--:--"} às ${r.end || "--:--"}`}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setProForm((p) => ({
+                            ...p,
+                            closedRanges: (p.closedRanges || []).filter((x) => x.id !== r.id),
+                          }))
+                        }
+                        className="text-slate-300 hover:text-red-500 transition-colors"
+                      >
+                        <span className="material-symbols-outlined">delete</span>
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
             {/* serviços (droplist/multi) */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -2510,10 +3150,172 @@ function AdminDashboardInner() {
               <div className="mt-2">
                 <span className="text-[9px] font-bold uppercase text-slate-400">Status atual</span>
                 <p className="text-[11px] font-extrabold text-slate-700">
-                {bookingStatusLabel(selectedBookingStatus)}
+                  {bookingStatusLabel(selectedBookingStatus)}
                 </p>
               </div>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setRescheduleOpen((v) => !v)}
+              disabled={selectedBookingStatus !== "confirmed"}
+              className={[
+                "h-12 rounded-2xl border font-extrabold text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.99]",
+                selectedBookingStatus !== "confirmed"
+                  ? "bg-slate-50 border-slate-200 text-slate-300"
+                  : rescheduleOpen
+                    ? "bg-primary/10 border-primary/30 text-primary"
+                    : "bg-white border-primary/20 text-primary",
+              ].join(" ")}
+            >
+              <span className="material-symbols-outlined text-[20px]">edit_calendar</span>
+              Reagendar
+            </button>
+
+            {rescheduleOpen ? (
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Profissional</label>
+                  <select
+                    className="w-full h-12 px-4 rounded-2xl border border-slate-200 bg-white text-sm font-semibold focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all"
+                    value={rescheduleProfessionalId}
+                    onChange={(e) => setRescheduleProfessionalId(e.target.value)}
+                  >
+                    {team.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nova data</label>
+                    <input
+                      type="date"
+                      className="w-full h-12 px-4 rounded-2xl border border-slate-200 bg-white text-sm font-semibold focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all"
+                      value={rescheduleDate}
+                      onChange={(e) => setRescheduleDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Novo horário</label>
+                    <input
+                      type="time"
+                      className="w-full h-12 px-4 rounded-2xl border border-slate-200 bg-white text-sm font-semibold focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all"
+                      value={rescheduleTime}
+                      onChange={(e) => setRescheduleTime(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Dias disponíveis</p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!rescheduleMonthView) return;
+                          const prev = new Date(rescheduleMonthView.getFullYear(), rescheduleMonthView.getMonth() - 1, 1);
+                          setRescheduleMonthView(prev);
+                        }}
+                        className="w-8 h-8 rounded-full border border-slate-200 text-slate-500 flex items-center justify-center hover:border-primary/40"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">chevron_left</span>
+                      </button>
+                      <span className="text-xs font-bold text-slate-600">
+                        {rescheduleMonthView ? rescheduleMonthView.toLocaleString("pt-BR", { month: "long", year: "numeric" }) : ""}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!rescheduleMonthView) return;
+                          const next = new Date(rescheduleMonthView.getFullYear(), rescheduleMonthView.getMonth() + 1, 1);
+                          setRescheduleMonthView(next);
+                        }}
+                        className="w-8 h-8 rounded-full border border-slate-200 text-slate-500 flex items-center justify-center hover:border-primary/40"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                      </button>
+                    </div>
+                  </div>
+                  {rescheduleMonthView ? (
+                    <div className="grid grid-cols-7 gap-1 text-center">
+                      {["D", "S", "T", "Q", "Q", "S", "S"].map((d, idx) => (
+                        <span key={`${d}-${idx}`} className="text-[10px] font-bold text-slate-400">
+                          {d}
+                        </span>
+                      ))}
+                      {Array.from({ length: new Date(rescheduleMonthView.getFullYear(), rescheduleMonthView.getMonth(), 1).getDay() }).map(
+                        (_, idx) => (
+                          <span key={`empty-${idx}`} />
+                        )
+                      )}
+                      {Array.from({
+                        length: new Date(rescheduleMonthView.getFullYear(), rescheduleMonthView.getMonth() + 1, 0).getDate(),
+                      }).map((_, idx) => {
+                        const day = idx + 1;
+                        const date = new Date(rescheduleMonthView.getFullYear(), rescheduleMonthView.getMonth(), day);
+                        const ymd = toYMD(date);
+                        const isSelected = rescheduleDate === ymd;
+                        const available = rescheduleAvailabilityMap.get(ymd) === true;
+                        return (
+                          <button
+                            key={ymd}
+                            type="button"
+                            onClick={() => setRescheduleDate(ymd)}
+                            className={[
+                              "h-9 rounded-lg text-xs font-extrabold border transition-all",
+                              available ? "border-emerald-200 text-emerald-700" : "border-slate-200 text-slate-400",
+                              isSelected ? "bg-primary text-white border-primary" : "bg-white",
+                            ].join(" ")}
+                          >
+                            {day}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Horários disponíveis</p>
+                  {getDayBlockReason(rescheduleDate, rescheduleProfessional) ? (
+                    <p className="text-xs font-semibold text-rose-600">
+                      {getDayBlockReason(rescheduleDate, rescheduleProfessional)}
+                    </p>
+                  ) : rescheduleLoading ? (
+                    <p className="text-xs font-semibold text-slate-500">Carregando horários...</p>
+                  ) : rescheduleSlots.length === 0 ? (
+                    <p className="text-xs font-semibold text-slate-500">Sem horários disponíveis para esta data.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {rescheduleSlots.map((time) => (
+                        <button
+                          key={time}
+                          type="button"
+                          onClick={() => setRescheduleTime(time)}
+                          className={[
+                            "h-9 px-3 rounded-xl border text-xs font-extrabold transition-all active:scale-[0.98]",
+                            rescheduleTime === time
+                              ? "bg-primary text-white border-primary shadow-sm shadow-primary/20"
+                              : "bg-white text-slate-700 border-slate-200 hover:border-primary/40",
+                          ].join(" ")}
+                        >
+                          {time}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={rescheduleBooking}
+                  className="w-full h-12 rounded-2xl bg-slate-900 text-white font-extrabold text-sm shadow-xl shadow-slate-200 active:scale-[0.99]"
+                >
+                  Salvar reagendamento
+                </button>
+              </div>
+            ) : null}
 
             <div className="grid grid-cols-2 gap-3">
               <button
