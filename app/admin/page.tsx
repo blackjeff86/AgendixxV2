@@ -242,6 +242,9 @@ function isHoldExpired(ts?: Timestamp | null) {
   return ts.toMillis() < Date.now();
 }
 
+const TRIAL_DAYS = 7;
+const AGENDIXX_WHATSAPP = String(process.env.NEXT_PUBLIC_AGENDIXX_WHATSAPP ?? "").replace(/\D/g, "");
+
 function bookingStatusLabel(status?: string) {
   if (status === "cancelled") return "Cancelado";
   if (status === "completed") return "Finalizado";
@@ -554,12 +557,18 @@ function AdminDashboardInner() {
     maxUses: "50",
     expiresDate: "",
   });
+  const [saveTenantSuccessOpen, setSaveTenantSuccessOpen] = useState(false);
+  const [trialExpired, setTrialExpired] = useState(false);
+  const [trialEndsAt, setTrialEndsAt] = useState<Timestamp | null>(null);
+  const [planStatus, setPlanStatus] = useState<string>("trial");
+  const [trialExpiredModalOpen, setTrialExpiredModalOpen] = useState(false);
 
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const [bookingSelectedId, setBookingSelectedId] = useState<string | null>(null);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [rescheduleTime, setRescheduleTime] = useState("");
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
   const [rescheduleProfessionalId, setRescheduleProfessionalId] = useState("");
   const [rescheduleMonthView, setRescheduleMonthView] = useState<Date | null>(null);
   const [rescheduleMonthBookings, setRescheduleMonthBookings] = useState<any[]>([]);
@@ -592,6 +601,20 @@ function AdminDashboardInner() {
           email: String(data?.adminEmail ?? ""),
           address: String(data?.address ?? ""),
         });
+        const status = String(data?.planStatus ?? "trial");
+        const trialEndsRaw = (data?.trialEndsAt as Timestamp | null | undefined) ?? null;
+        const createdAtRaw = (data?.createdAt as Timestamp | null | undefined) ?? null;
+        const computedTrialEnds =
+          trialEndsRaw ||
+          (createdAtRaw
+            ? Timestamp.fromDate(new Date(createdAtRaw.toDate().getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000))
+            : null);
+        const expired =
+          status !== "active" && computedTrialEnds ? computedTrialEnds.toMillis() < Date.now() : false;
+        setPlanStatus(status);
+        setTrialEndsAt(computedTrialEnds);
+        setTrialExpired(expired);
+        if (expired) setTrialExpiredModalOpen(true);
         const storedHours = Array.isArray(data?.openingHours) ? (data.openingHours as any[]) : null;
         setOpeningHours(
           storedHours
@@ -843,6 +866,10 @@ function AdminDashboardInner() {
 
   // ===== Actions =====
   async function copyLink() {
+    if (trialExpired) {
+      setTrialExpiredModalOpen(true);
+      return;
+    }
     await navigator.clipboard.writeText(bookingLink);
     alert("Link copiado!");
   }
@@ -868,6 +895,7 @@ function AdminDashboardInner() {
         closedDates: normalizedClosedDates,
         updatedAt: serverTimestamp(),
       });
+      setSaveTenantSuccessOpen(true);
     } catch (e: any) {
       alert(e?.message ?? "Erro ao salvar dados do salão.");
     }
@@ -1397,6 +1425,13 @@ function AdminDashboardInner() {
     return map;
   }, [rescheduleMonthStart, rescheduleMonthView, rescheduleProfessional, rescheduleMonthBookings]);
 
+  const trialDaysLeft = useMemo(() => {
+    if (!trialEndsAt) return null;
+    const msLeft = trialEndsAt.toMillis() - Date.now();
+    const days = Math.ceil(msLeft / (24 * 60 * 60 * 1000));
+    return Math.max(0, days);
+  }, [trialEndsAt]);
+
   async function updateBookingStatus(nextStatus: "cancelled" | "completed") {
     if (!bookingSelectedId) return;
     try {
@@ -1503,6 +1538,10 @@ function AdminDashboardInner() {
 
   function openAdminBooking() {
     if (!bookingLink) return;
+    if (trialExpired) {
+      setTrialExpiredModalOpen(true);
+      return;
+    }
     setAdminBookingOpen(true);
   }
 
@@ -1605,6 +1644,15 @@ function AdminDashboardInner() {
       <main className="max-w-md mx-auto pb-24">
         {activeView === "settings" ? (
           <section className="p-4 space-y-6" id="settings-view">
+            {planStatus !== "active" && trialDaysLeft !== null ? (
+              <div className="px-2">
+                <p className="text-[11px] font-semibold text-slate-400">
+                  {trialDaysLeft > 0
+                    ? `Seu período grátis termina em ${trialDaysLeft} dia(s).`
+                    : "Seu período grátis terminou."}
+                </p>
+              </div>
+            ) : null}
             <div className="space-y-4">
               <button
                 type="button"
@@ -1659,6 +1707,16 @@ function AdminDashboardInner() {
                       value={tenantForm.email}
                       onChange={(e) => setTenantForm((p) => ({ ...p, email: e.target.value }))}
                     />
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={saveTenantData}
+                      className="w-full h-12 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+                    >
+                      Salvar Alterações
+                    </button>
                   </div>
                 </div>
               ) : null}
@@ -2103,15 +2161,6 @@ function AdminDashboardInner() {
               ) : null}
             </div>
 
-            <div className="pt-4">
-              <button
-                type="button"
-                onClick={saveTenantData}
-                className="w-full h-14 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20 flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
-              >
-                Salvar Alterações
-              </button>
-            </div>
           </section>
         ) : (
           <>
@@ -2459,7 +2508,10 @@ function AdminDashboardInner() {
         <button
           type="button"
           onClick={openAdminBooking}
-          className="fixed right-5 bottom-6 z-[150] h-12 px-4 rounded-full bg-primary text-white font-bold shadow-lg shadow-primary/30 flex items-center gap-2 active:scale-[0.98]"
+          className={[
+            "fixed right-5 bottom-6 z-[150] h-12 px-4 rounded-full bg-primary text-white font-bold shadow-lg shadow-primary/30 flex items-center gap-2 active:scale-[0.98]",
+            trialExpired ? "opacity-70" : "",
+          ].join(" ")}
         >
           <span className="material-symbols-outlined text-[20px]">add</span>
           Novo agendamento
@@ -3120,6 +3172,63 @@ function AdminDashboardInner() {
           </div>
         </ModalShell>
 
+        <ModalShell
+          open={saveTenantSuccessOpen}
+          title="Dados atualizados"
+          subtitle="As informações do salão foram salvas com sucesso."
+          onClose={() => setSaveTenantSuccessOpen(false)}
+        >
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
+              <span className="material-symbols-outlined text-emerald-600 text-[22px]">check_circle</span>
+              <p className="text-sm font-semibold text-emerald-700">
+                Alterações salvas no banco de dados.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSaveTenantSuccessOpen(false)}
+              className="w-full h-12 rounded-2xl bg-slate-900 text-white font-extrabold text-sm shadow-xl shadow-slate-200 active:scale-[0.99]"
+            >
+              Ok
+            </button>
+          </div>
+        </ModalShell>
+
+        <ModalShell
+          open={trialExpiredModalOpen}
+          title="Período grátis encerrado"
+          subtitle="Seu período de 7 dias gratuitos terminou."
+          onClose={() => setTrialExpiredModalOpen(false)}
+        >
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4">
+              <span className="material-symbols-outlined text-amber-600 text-[22px]">workspace_premium</span>
+              <p className="text-sm font-semibold text-amber-700">
+                Para continuar usando o Agendixx, fale com nosso time no WhatsApp e solicite a assinatura.
+              </p>
+            </div>
+            {trialEndsAt ? (
+              <p className="text-[11px] font-semibold text-slate-500">
+                Seu período terminou em {toExpiresLabel(trialEndsAt)}.
+              </p>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                if (!AGENDIXX_WHATSAPP) {
+                  alert("WhatsApp da Agendixx não configurado.");
+                  return;
+                }
+                window.open(`https://wa.me/${AGENDIXX_WHATSAPP}`, "_blank");
+              }}
+              className="w-full h-12 rounded-2xl bg-emerald-600 text-white font-extrabold text-sm shadow-xl shadow-emerald-200 active:scale-[0.99]"
+            >
+              Falar no WhatsApp
+            </button>
+          </div>
+        </ModalShell>
+
         {/* Modal Agendamento */}
         <ModalShell
           open={bookingModalOpen}
@@ -3323,7 +3432,7 @@ function AdminDashboardInner() {
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
-                onClick={() => updateBookingStatus("cancelled")}
+                onClick={() => setCancelConfirmOpen(true)}
                 disabled={selectedBookingStatus !== "confirmed"}
                 className={[
                   "h-12 rounded-2xl border font-extrabold text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.99]",
@@ -3358,6 +3467,41 @@ function AdminDashboardInner() {
             >
               Fechar
             </button>
+          </div>
+        </ModalShell>
+
+        <ModalShell
+          open={cancelConfirmOpen}
+          title="Confirmar cancelamento"
+          subtitle="Esta ação não poderá ser desfeita."
+          onClose={() => setCancelConfirmOpen(false)}
+        >
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 bg-rose-50 border border-rose-200 rounded-2xl p-4">
+              <span className="material-symbols-outlined text-rose-600 text-[22px]">report</span>
+              <p className="text-sm font-semibold text-rose-700">
+                Tem certeza que deseja cancelar esta reserva?
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setCancelConfirmOpen(false)}
+                className="h-12 rounded-2xl bg-slate-50 border border-slate-200 text-slate-700 font-extrabold text-sm active:scale-[0.99]"
+              >
+                Voltar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCancelConfirmOpen(false);
+                  updateBookingStatus("cancelled");
+                }}
+                className="h-12 rounded-2xl bg-rose-600 text-white font-extrabold text-sm shadow-xl shadow-rose-200 active:scale-[0.99]"
+              >
+                Confirmar
+              </button>
+            </div>
           </div>
         </ModalShell>
     </div>

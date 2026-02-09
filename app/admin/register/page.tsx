@@ -4,7 +4,7 @@
  import Link from "next/link";
  import { useRouter } from "next/navigation";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp, setDoc, Timestamp } from "firebase/firestore";
  import { auth, db } from "@/lib/firebase";
  
  function slugifyName(input: string) {
@@ -64,7 +64,10 @@ function formatPhoneBR(value: string) {
  
        const cred = await createUserWithEmailAndPassword(auth, email, password);
  
-       await setDoc(tenantRef, {
+      const trialDays = 7;
+      const trialEndsAt = Timestamp.fromDate(new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000));
+
+      await setDoc(tenantRef, {
          name,
          slug,
          adminEmail: email,
@@ -72,6 +75,10 @@ function formatPhoneBR(value: string) {
          address: address.trim(),
          professionalsCount: Number(professionalsCount) || 0,
          adminUid: cred.user.uid,
+        planStatus: "trial",
+        trialDays,
+        trialStartAt: serverTimestamp(),
+        trialEndsAt,
          createdAt: serverTimestamp(),
          updatedAt: serverTimestamp(),
        });

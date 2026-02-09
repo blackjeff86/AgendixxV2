@@ -81,6 +81,9 @@ type ProCalendar = {
 type ModalVariant = "info" | "error" | "success";
 type ModalPosition = "bottom" | "center";
 
+const TRIAL_DAYS = 7;
+const AGENDIXX_WHATSAPP = String(process.env.NEXT_PUBLIC_AGENDIXX_WHATSAPP ?? "").replace(/\D/g, "");
+
 function pad2(n: number) {
   return String(n).padStart(2, "0");
 }
@@ -267,6 +270,7 @@ export default function BookingClientPage({ slug }: { slug?: string }) {
 
   const [loadingData, setLoadingData] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [trialExpired, setTrialExpired] = useState<boolean>(false);
 
   // ===== Calendário real =====
   const [proCalendars, setProCalendars] = useState<Record<string, ProCalendar | null>>({});
@@ -1022,6 +1026,16 @@ export default function BookingClientPage({ slug }: { slug?: string }) {
         const tenantData = tenantSnap.data() as any;
         const tenantName = String(tenantData?.name ?? "Salão");
         const tenantAddress = String(tenantData?.address ?? "");
+        const planStatus = String(tenantData?.planStatus ?? "trial");
+        const trialEndsAt = (tenantData?.trialEndsAt as Timestamp | null | undefined) ?? null;
+        const createdAt = (tenantData?.createdAt as Timestamp | null | undefined) ?? null;
+        const computedTrialEnds =
+          trialEndsAt ||
+          (createdAt
+            ? Timestamp.fromDate(new Date(createdAt.toDate().getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000))
+            : null);
+        const expired =
+          planStatus !== "active" && computedTrialEnds ? computedTrialEnds.toMillis() < Date.now() : false;
         const openingHoursRaw = Array.isArray(tenantData?.openingHours) ? (tenantData.openingHours as any[]) : null;
         const closedDatesRaw = Array.isArray(tenantData?.closedDates) ? (tenantData.closedDates as any[]) : [];
         const closedRangesRaw = Array.isArray(tenantData?.closedRanges) ? (tenantData.closedRanges as any[]) : [];
@@ -1061,6 +1075,7 @@ export default function BookingClientPage({ slug }: { slug?: string }) {
 
         setSalonName(tenantName);
         setSalonAddress(tenantAddress);
+        setTrialExpired(expired);
         setTenantOpeningHours(
           openingHoursRaw
             ? openingHoursRaw
@@ -1790,6 +1805,41 @@ export default function BookingClientPage({ slug }: { slug?: string }) {
   return (
     <div className="flex flex-col items-center bg-background-offwhite text-slate-900">
       <div className="relative w-full max-w-[480px] min-h-screen flex flex-col bg-background-offwhite pb-48">
+        {trialExpired && (
+          <div className="fixed inset-0 z-[1001] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" />
+            <div className="relative w-full max-w-[440px] bg-white rounded-3xl border border-slate-100 card-shadow p-5">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-2xl flex items-center justify-center bg-amber-50 text-amber-600">
+                  <span className="material-symbols-outlined">workspace_premium</span>
+                </div>
+                <div className="flex flex-col">
+                  <h3 className="text-sm font-black text-slate-900">Período grátis encerrado</h3>
+                  <p className="text-[12px] font-medium text-slate-500 mt-1">
+                    Seu período de 7 dias gratuitos terminou. Para continuar usando o Agendixx, fale com nosso time no
+                    WhatsApp e solicite a assinatura.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!AGENDIXX_WHATSAPP) {
+                      openModal("Aviso", "WhatsApp da Agendixx não configurado.", "info", "center");
+                      return;
+                    }
+                    window.open(`https://wa.me/${AGENDIXX_WHATSAPP}`, "_blank");
+                  }}
+                  className="w-full h-12 bg-emerald-600 text-white font-black text-sm rounded-2xl shadow-2xl shadow-emerald-200 active:scale-[0.98] transition-all"
+                >
+                  Falar no WhatsApp
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Modal próprio */}
         {modalOpen && (
           <div
