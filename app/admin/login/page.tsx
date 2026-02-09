@@ -3,8 +3,9 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { signInWithEmailAndPassword, signInAnonymously } from "firebase/auth";
+import { auth, db } from "@/lib/firebase";
+import { collectionGroup, getDocs, limit, query, where } from "firebase/firestore";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -14,13 +15,87 @@ export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  function getTenantIdFromProfessionalDocRef(ref: any): string {
+    const parts = String(ref?.path || "").split("/");
+    const tenantsIdx = parts.indexOf("tenants");
+    if (tenantsIdx >= 0 && parts.length > tenantsIdx + 1) return String(parts[tenantsIdx + 1] || "");
+    return "";
+  }
+
+  async function ensureAnonymousAuth() {
+    if (auth.currentUser) return;
+    await signInAnonymously(auth);
+  }
+
+  async function tryProfessionalLogin(emailInput: string, passwordInput: string) {
+    await ensureAnonymousAuth();
+
+    const q = query(
+      collectionGroup(db, "professionals"),
+      where("email", "==", emailInput),
+      limit(10)
+    );
+
+    const snap = await getDocs(q);
+    if (snap.empty) return null;
+
+    const match = snap.docs.find((d) => String((d.data() as any)?.password ?? "") === String(passwordInput));
+    if (!match) return null;
+
+    const tenantId = getTenantIdFromProfessionalDocRef(match.ref);
+    const professionalId = match.id;
+    const data = match.data() as any;
+
+    return {
+      tenantId,
+      professionalId,
+      name: String(data?.name ?? ""),
+      email: String(data?.email ?? emailInput),
+    };
+  }
+
   async function onSubmit() {
     setLoading(true);
     setErrorVisible(false);
+
+    const emailInput = email.trim().toLowerCase();
+    const passwordInput = password;
+
+    // 1) Admin via Firebase Auth
     try {
-      await signInWithEmailAndPassword(auth, email.trim(), password);
+      await signInWithEmailAndPassword(auth, emailInput, passwordInput);
       router.push("/admin");
-    } catch {
+      return;
+    } catch (err: any) {
+      // normal quando o usuário NÃO existe no Firebase Auth (caso profissional)
+      console.log("Login não é admin (tentando profissional)...", err?.code);
+    }
+
+    // 2) Profissional via Firestore
+    try {
+      const pro = await tryProfessionalLogin(emailInput, passwordInput);
+
+      if (pro && pro.tenantId && pro.professionalId) {
+        localStorage.setItem(
+          "agx_professional_session",
+          JSON.stringify({
+            role: "professional",
+            tenantId: pro.tenantId,
+            professionalId: pro.professionalId,
+            email: pro.email,
+            name: pro.name,
+            createdAt: Date.now(),
+          })
+        );
+
+        router.push("/admin/users");
+        return;
+      }
+
+      setErrorVisible(true);
+    } catch (err: any) {
+      // se o índice não existir ainda, vai cair aqui
+      console.error("Professional auth falhou:", err?.code, err?.message);
       setErrorVisible(true);
     } finally {
       setLoading(false);

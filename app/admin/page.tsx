@@ -30,6 +30,10 @@ type TeamMember = {
   avatarUrl?: string;
   active: boolean;
 
+  // credenciais do profissional (para login na área /admin/users)
+  email?: string;
+  password?: string;
+
   // novos (para leitura do banco)
   workingDays?: number[]; // 0=Dom ... 6=Sáb
   absenceStartAt?: Timestamp | null;
@@ -525,6 +529,10 @@ function AdminDashboardInner() {
     name: "",
     active: true,
 
+    // credenciais do profissional (login em /admin/users)
+    email: "",
+    password: "",
+
     // escala (dias da semana)
     workingDays: [1, 2, 3, 4, 5] as number[], // default Seg-Sex (0=Dom ... 6=Sáb)
     shift: "morning" as "morning" | "afternoon" | "evening",
@@ -670,6 +678,9 @@ function AdminDashboardInner() {
           servicesActive: 0, // calculamos com services
           absenceLabel,
           active: Boolean(data?.active ?? true),
+
+          email: String(data?.email ?? ""),
+          password: String(data?.password ?? ""),
 
           workingDays: normalizeWorkingDays(data?.workingDays),
           absenceStartAt: startAt,
@@ -960,6 +971,9 @@ function AdminDashboardInner() {
       name: "",
       active: true,
 
+      email: "",
+      password: "",
+
       workingDays: [1, 2, 3, 4, 5],
       shift: "morning",
 
@@ -996,6 +1010,9 @@ function AdminDashboardInner() {
     setProForm({
       name: p.name,
       active: Boolean(p.active),
+
+      email: String((p as any)?.email ?? ""),
+      password: String((p as any)?.password ?? ""),
 
       workingDays: normalizeWorkingDays(p.workingDays),
       shift: (p as any)?.shift ?? "morning",
@@ -1044,6 +1061,12 @@ function AdminDashboardInner() {
     const name = proForm.name.trim();
     if (!name) return alert("Informe o nome do profissional.");
 
+    const email = String((proForm as any).email ?? "").trim().toLowerCase();
+    const password = String((proForm as any).password ?? "").trim();
+
+    if (!email) return alert("Informe o email do profissional.");
+    if (!password) return alert("Informe a senha do profissional.");
+
 
     // working days
     const workingDays = normalizeWorkingDays(proForm.workingDays);
@@ -1088,6 +1111,9 @@ function AdminDashboardInner() {
     const basePayload: any = {
       name,
       active: Boolean(proForm.active),
+
+      email,
+      password,
 
       // NOVO: agenda (dias da semana)
       workingDays,
@@ -2719,9 +2745,35 @@ function AdminDashboardInner() {
                 onChange={(e) => setProForm((p) => ({ ...p, name: e.target.value }))}
                 placeholder="Ex: João Paulo"
               />
+            
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Email do profissional</label>
+                <input
+                  type="email"
+                  className="w-full h-12 px-4 rounded-2xl border border-slate-200 bg-white text-sm font-semibold focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all"
+                  value={proForm.email}
+                  onChange={(e) => setProForm((p) => ({ ...p, email: e.target.value }))}
+                  placeholder="ex: joao@agendixx.com"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Senha</label>
+                <input
+                  type="password"
+                  className="w-full h-12 px-4 rounded-2xl border border-slate-200 bg-white text-sm font-semibold focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all"
+                  value={proForm.password}
+                  onChange={(e) => setProForm((p) => ({ ...p, password: e.target.value }))}
+                  placeholder="Defina uma senha"
+                />
+              </div>
             </div>
 
             {/* NOVO: calendário do profissional (dias da semana) */}
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Dias de atuação</label>
