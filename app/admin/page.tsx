@@ -1317,8 +1317,11 @@ function AdminDashboardInner() {
       if (!tenantId) return;
       setRescheduleLoading(true);
       try {
-        const startTs = Timestamp.fromDate(rescheduleMonthStart);
-        const endTs = Timestamp.fromDate(rescheduleMonthEnd);
+        const monthStart = rescheduleMonthStart;
+        const monthEnd = rescheduleMonthEnd;
+        if (!monthStart || !monthEnd) return;
+        const startTs = Timestamp.fromDate(monthStart);
+        const endTs = Timestamp.fromDate(monthEnd);
         const bookingsRef = collection(db, "tenants", tenantId, "bookings");
         const holdsRef = collection(db, "tenants", tenantId, "holds");
 
