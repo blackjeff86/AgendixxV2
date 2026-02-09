@@ -2722,19 +2722,21 @@ export default function BookingClientPage({ slug }: { slug?: string }) {
             <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">5. Cupom e Pagamento</h2>
 
               <div className="bg-white p-5 rounded-ios border border-slate-100 card-shadow space-y-5">
-                <div className="flex flex-wrap items-center gap-3 p-1 pl-4 bg-slate-50 border border-slate-100 rounded-xl focus-within:ring-2 focus-within:ring-[color:rgb(217_119_6/0.10)] transition-all">
-                  <span className="material-symbols-outlined text-slate-400 text-[20px]">confirmation_number</span>
-                  <input
-                    className="flex-1 min-w-0 bg-transparent border-none p-0 h-10 text-sm font-bold placeholder:text-slate-400 focus:ring-0"
-                    placeholder="Inserir código"
-                    type="text"
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value)}
-                  />
+                <div className="flex flex-col gap-3 p-3 bg-slate-50 border border-slate-100 rounded-xl focus-within:ring-2 focus-within:ring-[color:rgb(217_119_6/0.10)] transition-all">
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-slate-400 text-[20px]">confirmation_number</span>
+                    <input
+                      className="flex-1 min-w-0 bg-transparent border-none p-0 h-10 text-sm font-bold placeholder:text-slate-400 focus:ring-0"
+                      placeholder="Inserir código"
+                      type="text"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value)}
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={onApplyCoupon}
-                    className="px-4 h-9 w-full sm:w-auto shrink-0 bg-client-primary text-white text-[11px] font-black uppercase tracking-wider rounded-lg shadow-sm shadow-[color:rgb(217_119_6/0.20)] active:scale-95 transition-all"
+                    className="h-9 px-6 mx-auto bg-client-primary text-white text-[11px] font-black uppercase tracking-wider rounded-lg shadow-sm shadow-[color:rgb(217_119_6/0.20)] active:scale-95 transition-all"
                   >
                     Aplicar
                   </button>
