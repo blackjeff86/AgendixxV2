@@ -46,7 +46,18 @@ type Coupon = {
   code: string;
   status: "Ativo" | "Inativo";
   percentOff: number;
+
+  // label para exibição (ex: "Todos" ou nome do profissional)
   linkedTo: string;
+
+  // regra de aplicação (persistida no Firestore)
+  appliesTo: "ALL" | "PROFESSIONAL";
+  professionalId?: string | null;
+  professionalName?: string | null;
+
+  // valor usado no formulário (ALL | profissionalId)
+  linkedToId: string;
+
   used: number;
   maxUses: number;
   expiresLabel: string;
@@ -561,7 +572,7 @@ function AdminDashboardInner() {
     code: "",
     active: true,
     percentOff: "10",
-    linkedTo: "Todos",
+    linkedToId: "ALL",
     maxUses: "50",
     expiresDate: "",
   });
@@ -747,12 +758,31 @@ function AdminDashboardInner() {
         const percentOff = Number(data?.percentOff ?? 0);
         const expiresAt = (data?.expiresAt as Timestamp | null | undefined) ?? null;
 
+        const legacyLinkedTo = String(data?.linkedTo ?? "Todos");
+
+        const appliesTo: "ALL" | "PROFESSIONAL" =
+          (data?.appliesTo as any) === "PROFESSIONAL"
+            ? "PROFESSIONAL"
+            : (data?.professionalId || (legacyLinkedTo && legacyLinkedTo !== "Todos"))
+              ? "PROFESSIONAL"
+              : "ALL";
+
+        const professionalId = data?.professionalId ? String(data.professionalId) : null;
+        const professionalName = data?.professionalName ? String(data.professionalName) : null;
+
+        const linkedToLabel = appliesTo === "ALL" ? "Todos" : (professionalName || legacyLinkedTo || "—");
+        const linkedToId = appliesTo === "ALL" ? "ALL" : (professionalId || "");
+
         return {
           id: d.id,
           code,
           status: active ? "Ativo" : "Inativo",
           percentOff,
-          linkedTo: String(data?.linkedTo ?? "Todos"),
+          linkedTo: linkedToLabel,
+          appliesTo,
+          professionalId,
+          professionalName,
+          linkedToId,
           used,
           maxUses,
           expiresLabel: toExpiresLabel(expiresAt),
@@ -1154,7 +1184,7 @@ function AdminDashboardInner() {
       code: "",
       active: true,
       percentOff: "10",
-      linkedTo: "Todos",
+      linkedToId: "ALL",
       maxUses: "50",
       expiresDate: "",
     });
@@ -1167,7 +1197,7 @@ function AdminDashboardInner() {
       code: c.code,
       active: Boolean(c.active),
       percentOff: String(c.percentOff ?? 0),
-      linkedTo: c.linkedTo ?? "Todos",
+      linkedToId: c.linkedToId ?? "ALL",
       maxUses: String(c.maxUses ?? 0),
       expiresDate: tsToInputDate(c.expiresAt ?? null),
     });
@@ -1184,14 +1214,29 @@ function AdminDashboardInner() {
     const maxUses = Number(couponForm.maxUses);
     if (!Number.isFinite(maxUses) || maxUses < 0) return alert("Qtd de usos inválida.");
 
-    const linkedTo = (couponForm.linkedTo || "Todos").trim();
+    const selection = String(couponForm.linkedToId || "ALL");
+
+    const appliesTo: "ALL" | "PROFESSIONAL" = selection === "ALL" ? "ALL" : "PROFESSIONAL";
+    const pro = appliesTo === "PROFESSIONAL" ? team.find((p) => p.id === selection) : null;
+
+    // label de exibição (mantém compatibilidade com o layout atual)
+    const linkedTo = appliesTo === "ALL" ? "Todos" : String(pro?.name ?? "—");
+
     const expiresAt = inputDateToTimestamp(couponForm.expiresDate);
 
     const payload = {
       code,
       active: Boolean(couponForm.active),
       percentOff,
+
+      // compatível com o que já existe na UI (exibe em cards)
       linkedTo,
+
+      // regra persistida no banco (para aplicação correta)
+      appliesTo,
+      professionalId: appliesTo === "PROFESSIONAL" ? String(pro?.id ?? selection) : null,
+      professionalName: appliesTo === "PROFESSIONAL" ? String(pro?.name ?? null) : null,
+
       maxUses,
       expiresAt,
       updatedAt: serverTimestamp(),
@@ -2810,34 +2855,6 @@ function AdminDashboardInner() {
                 </p>
               </div>
             </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Turno</label>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { id: "morning", label: "Manhã" },
-                  { id: "afternoon", label: "Tarde" },
-                  { id: "evening", label: "Noite" },
-                ].map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => setProForm((p) => ({ ...p, shift: opt.id as any }))}
-                    className={[
-                      "h-10 px-4 rounded-full border text-[11px] font-extrabold transition-all active:scale-[0.99]",
-                      proForm.shift === opt.id
-                        ? "bg-primary text-white border-primary shadow-md shadow-primary/20"
-                        : "bg-white border-slate-200 text-slate-600",
-                    ].join(" ")}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</label>
@@ -3197,12 +3214,21 @@ function AdminDashboardInner() {
 
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Vinculado a</label>
-              <input
+              <select
                 className="w-full h-12 px-4 rounded-2xl border border-slate-200 bg-white text-sm font-semibold focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all"
-                value={couponForm.linkedTo}
-                onChange={(e) => setCouponForm((p) => ({ ...p, linkedTo: e.target.value }))}
-                placeholder="Ex: Todos / João Paulo"
-              />
+                value={couponForm.linkedToId}
+                onChange={(e) => setCouponForm((p) => ({ ...p, linkedToId: e.target.value }))}
+              >
+                <option value="ALL">Para Todos</option>
+                {team.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[10px] text-slate-400">
+                O cupom será válido apenas para o profissional selecionado ou para todos, se &quot;Para Todos&quot; estiver selecionado.
+              </p>
             </div>
 
             <div className="pt-2 flex gap-3">
