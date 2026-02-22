@@ -1,5 +1,6 @@
 "use client"
 
+import React, { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import MaterialIcon from "./MaterialIcon"
 import ThemeToggle from "./ThemeToggle"
@@ -25,6 +26,37 @@ export default function AdminMobileShell({
   children,
   showBottomNav = true,
 }: Props) {
+  const [moreOpen, setMoreOpen] = useState(false)
+  const moreBtnRef = useRef<HTMLButtonElement | null>(null)
+  const moreMenuRef = useRef<HTMLDivElement | null>(null)
+
+  // Fecha ao clicar fora
+  useEffect(() => {
+    function onPointerDown(e: MouseEvent | TouchEvent) {
+      if (!moreOpen) return
+      const target = e.target as Node | null
+      if (!target) return
+      if (moreBtnRef.current?.contains(target)) return
+      if (moreMenuRef.current?.contains(target)) return
+      setMoreOpen(false)
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (!moreOpen) return
+      if (e.key === "Escape") setMoreOpen(false)
+    }
+
+    document.addEventListener("mousedown", onPointerDown)
+    document.addEventListener("touchstart", onPointerDown, { passive: true })
+    document.addEventListener("keydown", onKeyDown)
+
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown)
+      document.removeEventListener("touchstart", onPointerDown as any)
+      document.removeEventListener("keydown", onKeyDown)
+    }
+  }, [moreOpen])
+
   return (
     <div className="relative flex min-h-dvh w-full max-w-[430px] mx-auto flex-col overflow-hidden bg-background-light dark:bg-background-dark shadow-2xl">
       {/* Header (mesma estrutura do MobileShell público) */}
@@ -93,12 +125,89 @@ export default function AdminMobileShell({
             active={active === "relatorios"}
           />
 
-          <NavItem
-            href={`/c/${slug}/admin/configuracoes`}
-            label="Mais"
-            icon="settings"
-            active={active === "mais"}
-          />
+          {/* MAIS (abre menu) */}
+          <div className="relative">
+            <button
+              ref={moreBtnRef}
+              type="button"
+              onClick={() => setMoreOpen((v) => !v)}
+              className={`flex flex-col items-center gap-1 group ${
+                active === "mais" ? "text-primary" : "text-slate-400 dark:text-slate-500 group-hover:text-primary"
+              } transition-colors`}
+              aria-haspopup="menu"
+              aria-expanded={moreOpen}
+              aria-label="Mais"
+              title="Mais"
+            >
+              <div className="flex h-8 items-center justify-center">
+                <MaterialIcon
+                  name="settings"
+                  className={active === "mais" ? "text-primary text-[28px]" : "text-[28px]"}
+                  filled={active === "mais"}
+                />
+              </div>
+              <p className={active === "mais" ? "text-[10px] font-bold text-primary" : "text-[10px] font-medium"}>
+                Mais
+              </p>
+            </button>
+
+            {/* Menu popover */}
+            {moreOpen ? (
+              <div
+                ref={moreMenuRef}
+                role="menu"
+                className="absolute bottom-14 right-0 w-56 rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden"
+              >
+                <div className="px-3 py-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                  Mais opções
+                </div>
+
+                <Link
+                  role="menuitem"
+                  href={`/c/${slug}/admin/marketing`}
+                  onClick={() => setMoreOpen(false)}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition"
+                >
+                  <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 shrink-0">
+                    <MaterialIcon name="campaign" className="text-primary text-[22px]" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold leading-tight">Marketing</div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                      Campanhas, promoções e mensagens
+                    </div>
+                  </div>
+                </Link>
+
+                <Link
+                  role="menuitem"
+                  href={`/c/${slug}/admin/configuracoes`}
+                  onClick={() => setMoreOpen(false)}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition"
+                >
+                  <span className="flex size-9 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 shrink-0">
+                    <MaterialIcon name="tune" className="text-slate-700 dark:text-slate-200 text-[22px]" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold leading-tight">Ajustes</div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                      Preferências, clínica e sistema
+                    </div>
+                  </div>
+                </Link>
+
+                <div className="px-3 py-2">
+                  <button
+                    type="button"
+                    onClick={() => setMoreOpen(false)}
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition"
+                  >
+                    Fechar
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </nav>
       ) : null}
     </div>
