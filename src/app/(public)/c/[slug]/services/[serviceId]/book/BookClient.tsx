@@ -123,6 +123,7 @@ export default function BookClient({
 
         const list = await fetchAvailableSlots({
           slug,
+          serviceId, 
           professionalId: proId,
           date,
         })
@@ -147,7 +148,7 @@ export default function BookClient({
       alive = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug, date, proId])
+  }, [slug, serviceId, date, proId])
 
   const canContinue = Boolean(date && time && proId && !loadingSlots && !loadFailed)
 

@@ -51,9 +51,9 @@ function formatDatePt(iso?: string) {
 }
 
 function normalizeRows<T>(res: unknown): T[] {
-  const anyRes = res as any
+  const anyRes = res as { rows?: unknown } | unknown[]
   if (Array.isArray(anyRes)) return anyRes as T[]
-  if (anyRes && Array.isArray(anyRes.rows)) return anyRes.rows as T[]
+  if (anyRes && typeof anyRes === "object" && Array.isArray((anyRes as any).rows)) return (anyRes as any).rows as T[]
   return []
 }
 
@@ -77,7 +77,7 @@ export default async function Page({
 
   if (!date || !time || !proId) return notFound()
 
-  // ✅ service real do banco (sem mock) — robusto para {rows} ou array
+  // service real do banco
   const sRes = await sql`
     select
       id,
@@ -95,7 +95,7 @@ export default async function Page({
   const service = sRows[0]
   if (!service?.id) return notFound()
 
-  // ✅ profissional real do banco — robusto para {rows} ou array
+  // profissional real do banco
   const pRes = await sql`
     select id, name, specialty, photo_url
     from public.professionals

@@ -4,6 +4,8 @@ import Link from "next/link"
 import MaterialIcon from "./MaterialIcon"
 import ThemeToggle from "./ThemeToggle"
 
+type ShellVariant = "public" | "admin"
+
 type Props = {
   slug: string
   title: string
@@ -13,6 +15,9 @@ type Props = {
 
   // opcional (não muda o padrão): útil em telas com footer fixo (/book, /confirm)
   showBottomNav?: boolean
+
+  // ✅ NOVO: permite 2 tipos de bottom nav (padrão: public)
+  variant?: ShellVariant
 }
 
 export default function MobileShell({
@@ -22,6 +27,7 @@ export default function MobileShell({
   active = "home",
   children,
   showBottomNav = true,
+  variant = "public",
 }: Props) {
   return (
     <div className="relative flex min-h-dvh w-full max-w-[430px] mx-auto flex-col overflow-hidden bg-background-light dark:bg-background-dark shadow-2xl">
@@ -33,9 +39,7 @@ export default function MobileShell({
           </div>
           <div>
             <h1 className="text-lg font-bold leading-tight tracking-tight">{title}</h1>
-            {subtitle ? (
-              <p className="text-xs text-slate-500 dark:text-slate-400">{subtitle}</p>
-            ) : null}
+            {subtitle ? <p className="text-xs text-slate-500 dark:text-slate-400">{subtitle}</p> : null}
           </div>
         </div>
 
@@ -54,28 +58,49 @@ export default function MobileShell({
       </header>
 
       {/* Content */}
-      <main className={`flex-1 overflow-y-auto no-scrollbar ${showBottomNav ? "pb-24" : ""}`}>
-        {children}
-      </main>
+      <main className={`flex-1 overflow-y-auto no-scrollbar ${showBottomNav ? "pb-24" : ""}`}>{children}</main>
 
       {/* Bottom Nav */}
       {showBottomNav ? (
         <nav className="absolute bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-100 dark:border-slate-800 px-6 pt-2 pb-6 flex justify-between items-center z-30">
-          <NavItem href={`/c/${slug}`} label="Home" icon="home" active={active === "home"} filled />
-          <NavItem
-            href={`/c/${slug}/services`}
-            label="Serviços"
-            icon="auto_awesome"
-            active={active === "services"}
-            filled
-          />
-          <NavItem
-            href={`/c/${slug}/agenda`}
-            label="Agenda"
-            icon="calendar_month"
-            active={active === "agenda"}
-          />
-          <NavItem href={`/c/${slug}/me`} label="Perfil" icon="person" active={active === "profile"} />
+          {variant === "public" ? (
+            <>
+              <NavItem href={`/c/${slug}`} label="Home" icon="home" active={active === "home"} filled />
+              <NavItem
+                href={`/c/${slug}/services`}
+                label="Serviços"
+                icon="auto_awesome"
+                active={active === "services"}
+                filled
+              />
+              <NavItem
+                href={`/c/${slug}/agenda`}
+                label="Agenda"
+                icon="calendar_month"
+                active={active === "agenda"}
+              />
+              <NavItem href={`/c/${slug}/me`} label="Perfil" icon="person" active={active === "profile"} />
+            </>
+          ) : (
+            <>
+              {/* ✅ Admin nav (não muda o public e não quebra nada) */}
+              <NavItem href={`/admin/${slug}`} label="Início" icon="home" active={active === "home"} filled />
+              <NavItem
+                href={`/admin/${slug}/agenda`}
+                label="Agenda"
+                icon="calendar_month"
+                active={active === "agenda"}
+              />
+              <NavItem
+                href={`/admin/${slug}/services`}
+                label="Serviços"
+                icon="auto_awesome"
+                active={active === "services"}
+                filled
+              />
+              <NavItem href={`/admin/${slug}/me`} label="Conta" icon="person" active={active === "profile"} />
+            </>
+          )}
         </nav>
       ) : null}
     </div>
@@ -95,9 +120,7 @@ function NavItem({
   active: boolean
   filled?: boolean
 }) {
-  const base = active
-    ? "text-primary"
-    : "text-slate-400 dark:text-slate-500 group-hover:text-primary transition-colors"
+  const base = active ? "text-primary" : "text-slate-400 dark:text-slate-500 group-hover:text-primary transition-colors"
 
   const text = active ? "text-[10px] font-bold text-primary" : "text-[10px] font-medium"
 
