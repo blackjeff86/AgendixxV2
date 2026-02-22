@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+/* ✅ Tailwind v4: habilita dark: via classe .dark */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Base tokens do app */
+:root {
+  --background: #fdf8fb; /* background-light */
+  --foreground: #0f172a; /* slate-900-ish */
+}
+
+/* ✅ Dark override via classe */
+.dark {
+  --background: #161022; /* background-dark */
+  --foreground: #f8fafc; /* slate-50 */
+}
+
+/* Tailwind v4 theme tokens */
+@theme inline {
+  /* ===== Agendixx v2 (Template Mobile) ===== */
+  --color-primary: #5b13ec;
+
+  --color-background-light: #fdf8fb;
+  --color-background-dark: #161022;
+  --color-soft-pink: #fce7f3;
+
+  /* mapear background/foreground */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  /* Fonte do template (setada no layout.tsx via next/font) */
+  --font-display: var(--font-display);
+
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1.5rem;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* esconder scrollbar */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Material Symbols: garante que a fonte é aplicada */
+.material-symbols-outlined {
+  font-family: "Material Symbols Outlined" !important;
+  font-weight: normal;
+  font-style: normal;
+  display: inline-block;
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+}
