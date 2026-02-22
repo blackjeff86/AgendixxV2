@@ -13,8 +13,6 @@ type ServiceRow = {
   description: string | null
   duration_minutes: number
   price_cents: number
-  image_url: string | null
-  category: string | null
 }
 
 type ProRow = {
@@ -86,9 +84,7 @@ export default async function Page({
       name,
       description,
       duration_minutes,
-      price_cents,
-      image_url,
-      category
+      price_cents
     from public.services
     where id = ${serviceId}::uuid
       and tenant_id = ${tenant.id}::uuid
@@ -155,7 +151,7 @@ export default async function Page({
           <div className="bg-white dark:bg-slate-900 rounded-xl overflow-hidden shadow-sm border border-black/5 dark:border-white/10 flex flex-col @sm:flex-row">
             <div
               className="w-full @sm:w-32 h-48 @sm:h-auto bg-center bg-cover"
-              style={{ backgroundImage: `url('${service.image_url || fallbackImage}')` }}
+              style={{ backgroundImage: `url('${fallbackImage}')` }}
             />
             <div className="p-4 flex flex-col justify-center flex-1">
               <div className="flex justify-between items-start gap-4">
@@ -163,7 +159,7 @@ export default async function Page({
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white leading-tight truncate">
                     {service.name}
                   </h2>
-                  <p className="text-primary font-medium mt-1">{service.category || "Serviço"}</p>
+                  <p className="text-primary font-medium mt-1">Serviço</p>
                 </div>
                 <span className="text-xl font-bold text-slate-900 dark:text-white whitespace-nowrap">
                   {moneyBRLFromCents(Number(service.price_cents || 0)).replace(",00", "")}
